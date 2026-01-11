@@ -60,6 +60,8 @@ function App() {
   const [isChatExpanded, setIsChatExpanded] = useState(true);
   const [lastSaved, setLastSaved] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
+  const [isAddingTask, setIsAddingTask] = useState(false); // Manual Task Modal State
+  const [manualTask, setManualTask] = useState({ title: '', subject: '', date: '', time: '08:00', type: 'task' });
   const chatEndRef = useRef(null);
 
   /* --- SUPABASE SYNC LOGIC --- */
@@ -216,18 +218,18 @@ function App() {
       if (incomingTasks.length > 0) {
         const newTasksWithIds = incomingTasks.map((t, idx) => ({
           ...t,
-          id: Date.now() + idx + Math.random(),
+          id: crypto.randomUUID(),
           completed: false,
           type: t.type || 'study'
         }));
         setTasks(prev => [...newTasksWithIds, ...prev]);
       }
       if (incomingClasses.length > 0) {
-        const newClassesWithIds = incomingClasses.map((c, idx) => ({ ...c, id: Date.now() + idx + Math.random(), type: 'class' }));
+        const newClassesWithIds = incomingClasses.map((c, idx) => ({ ...c, id: crypto.randomUUID(), type: 'class' }));
         setSchedule(prev => [...prev, ...newClassesWithIds]);
       }
       if (incomingActivities.length > 0) {
-        const newActivitiesWithIds = incomingActivities.map((a, idx) => ({ ...a, id: Date.now() + idx + Math.random(), type: 'activity' }));
+        const newActivitiesWithIds = incomingActivities.map((a, idx) => ({ ...a, id: crypto.randomUUID(), type: 'activity' }));
         setActivities(prev => [...prev, ...newActivitiesWithIds]);
       }
 
@@ -292,6 +294,7 @@ function App() {
           </div>
           <div className="header-actions">
             {lastSaved && <span className="save-indicator">Saved {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+            <button className="icon-btn notification-btn" onClick={() => setIsAddingTask(true)} title="Add Task Manually">➕ Add Task</button>
             <button className="icon-btn notification-btn">🔔</button>
           </div>
         </header>
@@ -405,6 +408,90 @@ function App() {
                   <button type="submit" className="save-btn">Save Changes</button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+        {isAddingTask && (
+          <div className="form-overlay">
+            <div className="add-block-form v2">
+              <h3>Add New {manualTask.type === 'task' ? 'Test/Exam' : 'Assignment'}</h3>
+              <div className="form-field">
+                <label>Title</label>
+                <input type="text" placeholder="e.g. Chapter 5 Test" value={manualTask.title} onChange={e => setManualTask({ ...manualTask, title: e.target.value })} />
+              </div>
+              <div className="form-field">
+                <label>Subject (Select or Type)</label>
+                <div className="subject-input-row">
+                  <select className="styled-select" onChange={e => setManualTask({ ...manualTask, subject: e.target.value })} value={manualTask.subject}>
+                    <option value="">Select a Class...</option>
+                    {schedule.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    <option value="Other">Other (Type below)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-field">
+                  <label>Due Date</label>
+                  <input type="date" value={manualTask.date} onChange={e => setManualTask({ ...manualTask, date: e.target.value })} />
+                </div>
+                <div className="form-field">
+                  <label>Time</label>
+                  <input type="time" value={manualTask.time} onChange={e => setManualTask({ ...manualTask, time: e.target.value })} />
+                </div>
+              </div>
+              <div className="form-field">
+                <label>Type</label>
+                <select className="styled-select" value={manualTask.type} onChange={e => setManualTask({ ...manualTask, type: e.target.value })}>
+                  <option value="task">Test / Exam (Generates Study Plan)</option>
+                  <option value="assignment">Assignment / HW</option>
+                </select>
+              </div>
+              <div className="form-actions">
+                <button className="cancel-btn" onClick={() => setIsAddingTask(false)}>Cancel</button>
+                <button className="save-btn" onClick={() => {
+                  if (!manualTask.title || !manualTask.date) return;
+
+                  // Generate Unique IDs
+                  const deadlineId = crypto.randomUUID();
+                  const deadlineDate = new Date(manualTask.date + 'T' + manualTask.time);
+
+                  const newTasksArray = [];
+
+                  // 1. The Main Deadline Task
+                  newTasksArray.push({
+                    id: deadlineId,
+                    title: `${manualTask.subject ? manualTask.subject + ': ' : ''}${manualTask.title}`,
+                    time: deadlineDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + (manualTask.time > '12:00' ? (parseInt(manualTask.time.split(':')[0]) - 12) + ':' + manualTask.time.split(':')[1] + ' PM' : manualTask.time + ' AM'),
+                    duration: '1h',
+                    type: 'task',
+                    priority: 'high',
+                    description: 'Manual Entry'
+                  });
+
+                  // 2. Generate Review Days (Simple 2-day fallback logic)
+                  if (manualTask.type === 'task') {
+                    ['Final Review', 'Prep Session'].forEach((label, idx) => {
+                      const reviewDate = new Date(deadlineDate);
+                      reviewDate.setDate(deadlineDate.getDate() - (idx + 1));
+                      if (reviewDate > new Date()) {
+                        newTasksArray.push({
+                          id: crypto.randomUUID(),
+                          title: `${manualTask.subject || 'Test'} - ${label}`,
+                          time: reviewDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', 4:00 PM',
+                          duration: '45m',
+                          type: 'study',
+                          priority: 'medium',
+                          description: 'Auto-generated study session'
+                        });
+                      }
+                    });
+                  }
+
+                  setTasks(prev => [...prev, ...newTasksArray]);
+                  setIsAddingTask(false);
+                  setManualTask({ title: '', subject: '', date: '', time: '08:00', type: 'task' });
+                }}>Add to Schedule</button>
+              </div>
             </div>
           </div>
         )}

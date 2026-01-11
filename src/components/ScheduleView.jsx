@@ -26,7 +26,7 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities }) => {
 
     const handleAddClass = () => {
         if (newClass.name && newClass.subject) {
-            setSchedule([...schedule, { id: Date.now(), ...newClass }]);
+            setSchedule([...schedule, { id: crypto.randomUUID(), ...newClass }]);
             setIsAddingClass(false);
             setNewClass({ name: '', subject: '' });
         }
@@ -52,7 +52,7 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities }) => {
                 setEditingBlockId(null);
             } else {
                 // CREATE new
-                setActivities([...activities, { ...blockData, id: Date.now() }]);
+                setActivities([...activities, { ...blockData, id: crypto.randomUUID() }]);
             }
 
             setIsAddingBlock(false);
