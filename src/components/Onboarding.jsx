@@ -57,12 +57,21 @@ export default function Onboarding({ onFinish, isChatExpanded, schedule = [], ac
             setView(currentData.view);
         }
 
-        if (!currentData.targetId) {
+        let targetId = currentData.targetId;
+
+        // Smart Re-targeting for modals
+        if (targetId === 'add-class-btn' && document.getElementById('class-form')) {
+            targetId = 'class-form';
+        } else if (targetId === 'add-routine-btn' && document.getElementById('routine-form')) {
+            targetId = 'routine-form';
+        }
+
+        if (!targetId) {
             setCoords({ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' });
             return;
         }
 
-        const el = document.getElementById(currentData.targetId);
+        const el = document.getElementById(targetId);
         if (el) {
             const rect = el.getBoundingClientRect();
             let newCoords = {};
@@ -70,37 +79,42 @@ export default function Onboarding({ onFinish, isChatExpanded, schedule = [], ac
             const viewportWidth = window.innerWidth;
             const viewportHeight = window.innerHeight;
 
-            switch (currentData.position) {
-                case 'right':
-                    newCoords = {
-                        top: Math.max(padding, Math.min(viewportHeight - 200, rect.top + rect.height / 2)),
-                        left: Math.min(viewportWidth - 340, rect.right + 20),
-                        transform: 'translateY(-50%)'
-                    };
-                    break;
-                case 'left':
-                    newCoords = {
-                        top: Math.max(padding, Math.min(viewportHeight - 200, rect.top + rect.height / 2)),
-                        left: Math.max(padding, rect.left - 340),
-                        transform: 'translateY(-50%)'
-                    };
-                    break;
-                case 'bottom':
-                    newCoords = {
-                        top: rect.bottom + 20,
-                        left: Math.max(160, Math.min(viewportWidth - 160, rect.left + rect.width / 2)),
-                        transform: 'translateX(-50%)'
-                    };
-                    break;
-                case 'top':
-                    newCoords = {
-                        top: Math.max(padding, rect.top - 200),
-                        left: Math.max(160, Math.min(viewportWidth - 160, rect.left + rect.width / 2)),
-                        transform: 'translateX(-50%)'
-                    };
-                    break;
-                default:
-                    newCoords = { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
+            // Different positioning for forms vs buttons
+            if (targetId.includes('form')) {
+                newCoords = { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
+            } else {
+                switch (currentData.position) {
+                    case 'right':
+                        newCoords = {
+                            top: Math.max(padding, Math.min(viewportHeight - 200, rect.top + rect.height / 2)),
+                            left: Math.min(viewportWidth - 340, rect.right + 20),
+                            transform: 'translateY(-50%)'
+                        };
+                        break;
+                    case 'left':
+                        newCoords = {
+                            top: Math.max(padding, Math.min(viewportHeight - 200, rect.top + rect.height / 2)),
+                            left: Math.max(padding, rect.left - 340),
+                            transform: 'translateY(-50%)'
+                        };
+                        break;
+                    case 'bottom':
+                        newCoords = {
+                            top: rect.bottom + 20,
+                            left: Math.max(160, Math.min(viewportWidth - 160, rect.left + rect.width / 2)),
+                            transform: 'translateX(-50%)'
+                        };
+                        break;
+                    case 'top':
+                        newCoords = {
+                            top: Math.max(padding, rect.top - 200),
+                            left: Math.max(160, Math.min(viewportWidth - 160, rect.left + rect.width / 2)),
+                            transform: 'translateX(-50%)'
+                        };
+                        break;
+                    default:
+                        newCoords = { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
+                }
             }
             setCoords(newCoords);
 

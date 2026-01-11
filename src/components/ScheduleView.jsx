@@ -312,7 +312,7 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities }) => {
             {/* Add Routine Block Modal */}
             {isAddingBlock && (
                 <div className="form-overlay">
-                    <div className="add-block-form v2">
+                    <div id="routine-form" className="add-block-form v2">
                         <h3>{editingBlockId ? 'Edit Routine Block' : 'Add Routine Block'}</h3>
 
                         <div className="form-field">
@@ -408,7 +408,9 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities }) => {
                                 setEditingBlockId(null);
                                 setNewBlock({ name: '', startTime: '', startAmPm: 'AM', endTime: '', endAmPm: 'PM', days: [selectedDay], type: 'activity', isFreeSlot: false });
                             }}>Cancel</button>
-                            <button className="save-btn" onClick={handleAddBlock}>{editingBlockId ? 'Update Block' : 'Save Block'}</button>
+                            <button id="save-routine-btn" className="save-btn" onClick={handleAddBlock}>
+                                {editingBlockId ? 'Update Block' : 'Save Block'}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -417,7 +419,7 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities }) => {
             {/* NEW: Add Class Modal */}
             {isAddingClass && (
                 <div className="form-overlay">
-                    <div className="add-block-form v2">
+                    <div id="class-form" className="add-block-form v2">
                         <h3>Add New Class</h3>
 
                         <div className="form-field">
@@ -454,7 +456,7 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities }) => {
                                 setIsAddingClass(false);
                                 setNewClass({ name: '', subject: '' });
                             }}>Cancel</button>
-                            <button className="save-btn" onClick={handleAddClass}>Save Class</button>
+                            <button id="save-class-btn" className="save-btn" onClick={handleAddClass}>Save Class</button>
                         </div>
                     </div>
                 </div>
