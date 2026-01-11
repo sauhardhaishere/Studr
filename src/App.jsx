@@ -37,16 +37,25 @@ const ChevronRight = () => (
 function App() {
   const [session, setSession] = useState(null);
   const [view, setView] = useState('home');
+  const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session) {
+        const hasSeen = localStorage.getItem(`hasSeenTutorial_${session.user.id}`);
+        if (!hasSeen) setShowTutorial(true);
+      }
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session) {
+        const hasSeen = localStorage.getItem(`hasSeenTutorial_${session.user.id}`);
+        if (!hasSeen) setShowTutorial(true);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -266,12 +275,20 @@ function App() {
     { key: 'later', title: 'Later', tasks: groupedTasks.later }
   ];
 
+  const handleFinishTutorial = () => {
+    if (session) {
+      localStorage.setItem(`hasSeenTutorial_${session.user.id}`, 'true');
+    }
+    setShowTutorial(false);
+  };
+
   if (!session) {
     return <Auth />;
   }
 
   return (
     <div className="layout-grid">
+      {showTutorial && <Onboarding onFinish={handleFinishTutorial} />}
       <aside className="sidebar">
         <div className="logo-area"><LogoIcon /></div>
         <nav className="nav-menu">
