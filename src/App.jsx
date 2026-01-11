@@ -296,7 +296,6 @@ function App() {
           <div className="header-actions">
             {lastSaved && <span className="save-indicator">Saved {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
             {lastSaved && <span className="save-indicator">Saved {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
-            <button className="icon-btn notification-btn">🔔</button>
           </div>
         </header>
 
