@@ -123,7 +123,7 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities }) => {
 
             <div className="classes-grid">
                 {schedule.length === 0 ? (
-                    <p className="no-classes">No classes added yet. Add your subjects to help Studr categorize tasks.</p>
+                    <p className="no-classes">No classes added yet. Add your subjects to help Calendly categorize tasks.</p>
                 ) : (
                     schedule.map(cls => (
                         <div key={cls.id} className="class-tag-card">

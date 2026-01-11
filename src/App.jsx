@@ -51,19 +51,19 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
   const [tasks, setTasks] = useState(() => {
-    const saved = localStorage.getItem('studr_tasks');
+    const saved = localStorage.getItem('calendly_tasks');
     return saved ? JSON.parse(saved) : [];
   });
   const [schedule, setSchedule] = useState(() => {
-    const saved = localStorage.getItem('studr_schedule');
+    const saved = localStorage.getItem('calendly_schedule');
     return saved ? JSON.parse(saved) : [];
   });
   const [activities, setActivities] = useState(() => {
-    const saved = localStorage.getItem('studr_activities');
+    const saved = localStorage.getItem('calendly_activities');
     return saved ? JSON.parse(saved) : [];
   });
   const [chatHistory, setChatHistory] = useState(() => {
-    const saved = localStorage.getItem('studr_chat');
+    const saved = localStorage.getItem('calendly_chat');
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -75,22 +75,22 @@ function App() {
   const chatEndRef = useRef(null);
 
   useEffect(() => {
-    localStorage.setItem('studr_tasks', JSON.stringify(tasks));
+    localStorage.setItem('calendly_tasks', JSON.stringify(tasks));
     setLastSaved(new Date());
   }, [tasks]);
 
   useEffect(() => {
-    localStorage.setItem('studr_schedule', JSON.stringify(schedule));
+    localStorage.setItem('calendly_schedule', JSON.stringify(schedule));
     setLastSaved(new Date());
   }, [schedule]);
 
   useEffect(() => {
-    localStorage.setItem('studr_activities', JSON.stringify(activities));
+    localStorage.setItem('calendly_activities', JSON.stringify(activities));
     setLastSaved(new Date());
   }, [activities]);
 
   useEffect(() => {
-    localStorage.setItem('studr_chat', JSON.stringify(chatHistory));
+    localStorage.setItem('calendly_chat', JSON.stringify(chatHistory));
     setLastSaved(new Date());
   }, [chatHistory]);
 
@@ -110,7 +110,7 @@ function App() {
       setChatHistory(updatedHistory);
 
       const fullContext = updatedHistory.slice(-5)
-        .map(msg => `${msg.author === 'user' ? 'User' : 'Studr'}: ${msg.text}`)
+        .map(msg => `${msg.author === 'user' ? 'User' : 'Calendly'}: ${msg.text}`)
         .join('\n');
 
       let result = null;
@@ -332,7 +332,7 @@ function App() {
           {isChatExpanded ? <ChevronRight /> : <ChevronLeft />}
         </div>
         <div className="chat-content-area is-scrollable" ref={chatEndRef}>
-          {chatHistory.length === 0 ? <div className="chat-empty-state">Ask Studr...</div> : (
+          {chatHistory.length === 0 ? <div className="chat-empty-state">Ask Calendly...</div> : (
             chatHistory.map((msg, idx) => (
               <div key={idx} className={`chat-bubble ${msg.author}`}>
                 {msg.author === 'ai' && <span className="chat-avatar">🤖</span>}

@@ -59,7 +59,7 @@ export default function Auth() {
                         <LogoIcon />
                     </div>
                     <h1>{isSignUp ? 'Create Account' : 'Welcome Back'}</h1>
-                    <p>{isSignUp ? 'Start your journey with Studr' : 'Sign in to continue your progress'}</p>
+                    <p>{isSignUp ? 'Start your journey with Calendly' : 'Sign in to continue your progress'}</p>
                 </div>
 
                 <form onSubmit={handleAuth} className="auth-form">

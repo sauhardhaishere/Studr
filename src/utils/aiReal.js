@@ -23,7 +23,7 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
     }
 
     const systemPrompt = `
-    You are Studr, a high-precision academic scheduling engine. 
+    You are Calendly, a high-precision academic scheduling engine. 
     
     CRITICAL: YOU MUST OPERATE USING THE INDEX SYSTEM BELOW. DO NOT USE YOUR OWN CALENDAR LOGIC.
     

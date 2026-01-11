@@ -49,4 +49,4 @@ To make this a link others can use:
 2. Go to [Vercel](https://vercel.com/) or [Netlify](https://www.netlify.com/).
 3. Connect your repository.
 4. Add your `.env` variables (**VITE_SUPABASE_URL** and **VITE_SUPABASE_ANON_KEY**) in the "Environment Variables" section of the deployment settings.
-5. Deploy! You will get a link like `studr.vercel.app`.
+5. Deploy! You will get a link like `calendly-ai.vercel.app`.

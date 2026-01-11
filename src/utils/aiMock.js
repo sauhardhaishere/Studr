@@ -269,12 +269,12 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           if (feelings.some(f => lastUserLower.includes(f))) {
             message = `${timeGreeting}! I'm doing great, thanks for asking. I'm ready to help you organize your classes and study sessions. Do you have any tests or assignments coming up?`;
           } else {
-            message = `${timeGreeting}! I'm Studr, your AI study assistant. How can I help you with your schedule today? You can tell me about upcoming tests or assignments!`;
+            message = `${timeGreeting}! I'm Calendly, your AI study assistant. How can I help you with your schedule today? You can tell me about upcoming tests or assignments!`;
           }
         } else if (lastUserLower.includes("thank") || lastUserLower.includes("thanks")) {
           message = "You're very welcome! I'm here to help you stay on top of your studies. Let me know if you need anything else!";
         } else if (lastUserLower.includes("who are you") || lastUserLower.includes("what are you")) {
-          message = "I'm Studr, your personal AI student assistant. I help you track your classes, manage your assignments, and create perfect study schedules for your exams. Want to try scheduling something?";
+          message = "I'm Calendly, your personal AI student assistant. I help you track your classes, manage your assignments, and create perfect study schedules for your exams. Want to try scheduling something?";
         } else {
           message = "I'm here to help! If you have a specific test or assignment, tell me the subject and date (e.g., 'Math test next Tuesday') and I'll build a study plan for you. Otherwise, feel free to ask me anything!";
         }
