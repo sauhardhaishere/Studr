@@ -1,3 +1,4 @@
+/* Auth Container - Centered Flexbox */
 .auth-container {
     min-height: 100vh;
     display: flex;
@@ -5,11 +6,13 @@
     justify-content: center;
     position: relative;
     overflow: hidden;
-    background: #0a0a0a;
+    background: #000000;
     color: white;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    padding: 20px;
 }
 
+/* Background - Pure Black */
 .auth-background {
     position: absolute;
     top: 0;
@@ -17,63 +20,20 @@
     right: 0;
     bottom: 0;
     z-index: 0;
+    background: #000;
 }
 
-.blob {
-    position: absolute;
-    filter: blur(80px);
-    border-radius: 50%;
-    opacity: 0.5;
-    animation: move 20s infinite alternate;
-}
-
-.blob-1 {
-    width: 400px;
-    height: 400px;
-    background: rgba(124, 58, 237, 0.4);
-    top: -100px;
-    left: -100px;
-}
-
-.blob-2 {
-    width: 350px;
-    height: 350px;
-    background: rgba(37, 99, 235, 0.3);
-    bottom: -50px;
-    right: -50px;
-    animation-delay: -5s;
-}
-
-.blob-3 {
-    width: 300px;
-    height: 300px;
-    background: rgba(236, 72, 153, 0.2);
-    top: 40%;
-    left: 50%;
-    animation-delay: -10s;
-}
-
-@keyframes move {
-    from {
-        transform: translate(0, 0) scale(1);
-    }
-
-    to {
-        transform: translate(50px, 50px) scale(1.1);
-    }
-}
-
+/* Auth Card - Monochrome */
 .auth-card {
     position: relative;
     z-index: 1;
     width: 100%;
     max-width: 420px;
     padding: 40px;
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 32px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    background: #000;
+    border: 1px solid #333;
+    border-radius: 24px;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 1);
 }
 
 .auth-header {
@@ -82,24 +42,22 @@
 }
 
 .auth-logo {
-    color: #7c3aed;
-    margin-bottom: 16px;
+    color: white;
+    margin-bottom: 24px;
     display: flex;
     justify-content: center;
 }
 
 .auth-header h1 {
-    font-size: 28px;
-    font-weight: 700;
+    font-size: 24px;
+    font-weight: 600;
     margin-bottom: 8px;
-    background: linear-gradient(to right, #fff, #a78bfa);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: white;
+    letter-spacing: -0.5px;
 }
 
 .auth-header p {
-    color: #94a3b8;
+    color: #666;
     font-size: 14px;
 }
 
@@ -118,62 +76,61 @@
 .input-group label {
     font-size: 13px;
     font-weight: 500;
-    color: #cbd5e1;
-    margin-left: 4px;
+    color: #888;
+    margin-left: 2px;
 }
 
 .input-group input {
     padding: 14px 16px;
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
+    background: #0a0a0a;
+    border: 1px solid #333;
+    border-radius: 8px;
     color: white;
-    font-size: 15px;
+    font-size: 14px;
     transition: all 0.2s;
+    outline: none;
 }
 
 .input-group input:focus {
-    outline: none;
-    border-color: #7c3aed;
-    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2);
-    background: rgba(15, 23, 42, 0.8);
+    border-color: white;
+    background: #111;
 }
 
 .auth-error {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    color: #f87171;
+    background: #1a0505;
+    border: 1px solid #441111;
+    color: #ff4444;
     padding: 12px;
-    border-radius: 10px;
-    font-size: 13px;
+    border-radius: 8px;
+    font-size: 12px;
     text-align: center;
 }
 
 .auth-message {
-    background: rgba(34, 197, 94, 0.1);
-    border: 1px solid rgba(34, 197, 94, 0.2);
-    color: #4ade80;
+    background: #051a0a;
+    border: 1px solid #114411;
+    color: #44ff88;
     padding: 12px;
-    border-radius: 10px;
-    font-size: 13px;
+    border-radius: 8px;
+    font-size: 12px;
     text-align: center;
 }
 
 .auth-submit {
     margin-top: 10px;
     padding: 14px;
-    background: #7c3aed;
-    color: white;
+    background: white;
+    color: black;
     border: none;
-    border-radius: 12px;
-    font-size: 15px;
+    border-radius: 8px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
 }
 
 .auth-submit:hover {
-    background: #6d28d9;
+    background: #e0e0e0;
     transform: translateY(-1px);
 }
 
@@ -190,12 +147,15 @@
 .toggle-auth {
     background: none;
     border: none;
-    color: #94a3b8;
+    color: #666;
     font-size: 13px;
     cursor: pointer;
     transition: color 0.2s;
+    text-decoration: underline;
+    text-decoration-color: #333;
 }
 
 .toggle-auth:hover {
-    color: #fff;
+    color: white;
+    text-decoration-color: white;
 }
