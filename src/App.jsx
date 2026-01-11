@@ -7,6 +7,7 @@ import CalendarView from './components/CalendarView'
 import ScheduleView from './components/ScheduleView'
 import { supabase } from './lib/supabase'
 import Auth from './components/Auth'
+import Onboarding from './components/Onboarding'
 
 /* Icons */
 const HomeIcon = () => (
@@ -292,9 +293,9 @@ function App() {
       <aside className="sidebar">
         <div className="logo-area"><LogoIcon /></div>
         <nav className="nav-menu">
-          <button className={`nav-item ${view === 'home' ? 'active' : ''}`} onClick={() => setView('home')}><HomeIcon /></button>
-          <button className={`nav-item ${view === 'calendar' ? 'active' : ''}`} onClick={() => setView('calendar')}><CalendarIcon /></button>
-          <button className={`nav-item ${view === 'schedule' ? 'active' : ''}`} onClick={() => setView('schedule')}><ScheduleIcon /></button>
+          <button id="nav-home" className={`nav-item ${view === 'home' ? 'active' : ''}`} onClick={() => setView('home')} title="Home"><HomeIcon /></button>
+          <button id="nav-calendar" className={`nav-item ${view === 'calendar' ? 'active' : ''}`} onClick={() => setView('calendar')} title="Calendar"><CalendarIcon /></button>
+          <button id="nav-schedule" className={`nav-item ${view === 'schedule' ? 'active' : ''}`} onClick={() => setView('schedule')} title="Schedule"><ScheduleIcon /></button>
         </nav>
         <div className="user-profile-mini">
           <div className="avatar small">{session.user.email[0].toUpperCase()}</div>
@@ -319,7 +320,7 @@ function App() {
           {view === 'home' && (
             <div className="dashboard-grid">
               <div className="schedule-actions-row">
-                <button className="add-class-pill main" onClick={() => setIsAddingTask(true)}>
+                <button id="add-task-btn" className="add-class-pill main" onClick={() => setIsAddingTask(true)}>
                   + Add New Task
                 </button>
               </div>
@@ -528,7 +529,7 @@ function App() {
         )}
       </main>
 
-      <div className={`chat-panel ${!isChatExpanded ? 'minimized' : ''}`}>
+      <div id="ai-chat-panel" className={`chat-panel ${!isChatExpanded ? 'minimized' : ''}`}>
         <div className="chat-toggle-tab" onClick={() => setIsChatExpanded(!isChatExpanded)}>
           {isChatExpanded ? <ChevronRight /> : <ChevronLeft />}
         </div>
