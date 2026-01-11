@@ -289,7 +289,7 @@ function App() {
 
   return (
     <div className="layout-grid">
-      {showTutorial && <Onboarding onFinish={handleFinishTutorial} />}
+      {showTutorial && <Onboarding onFinish={handleFinishTutorial} isChatExpanded={isChatExpanded} />}
       <aside className="sidebar">
         <div className="logo-area"><LogoIcon /></div>
         <nav className="nav-menu">
@@ -305,7 +305,7 @@ function App() {
         </div>
       </aside>
 
-      <main className="main-content">
+      <main className={`main-content ${isChatExpanded ? 'chat-open' : ''}`}>
         <header className="top-header">
           <div className="header-text">
             <h1>{view === 'home' ? `Good Afternoon, ${session.user.email.split('@')[0]}` : view === 'calendar' ? 'Your Schedule' : 'My Classes'}</h1>

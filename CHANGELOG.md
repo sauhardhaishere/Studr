@@ -1,4 +1,4 @@
-# Studr - Recent Changes
+# Calendly - Recent Changes
 
 ## Latest Update - Smart Test Preparation & UI Improvements
 
@@ -21,7 +21,7 @@
    ```
    You: "I have a Math midterm in 1 week"
    
-   Studr AI: "Got it! I've created a 5-day study plan for your Math midterm. 
+   Calendly AI: "Got it! I've created a 5-day study plan for your Math midterm. 
    Starting with reviewing notes, then practice problems, and a mock test before 
    the final review. You've got this!"
    
@@ -91,7 +91,7 @@
 
 ### How to Use:
 
-1. **Smart Test Prep**: Just tell Studr about your test with advance notice
+1. **Smart Test Prep**: Just tell Calendly about your test with advance notice
    - "I have a Biology final in 3 weeks"
    - "Chemistry midterm next month and I'm busy with basketball"
    - The AI will create a study plan for you!
@@ -101,7 +101,7 @@
 3. **Add Activities**: Go to the Schedule tab → Scroll to "Personal Activities" → Click "+ Add Activity"
    - Make sure to include AM/PM in the time!
 
-4. **Use AI Assistant**: Chat with Studr to add classes, activities, or tasks naturally
+4. **Use AI Assistant**: Chat with Calendly to add classes, activities, or tasks naturally
    - Example: "Add my soccer practice, it's every weekday at 4pm"
    - Example: "I have Chemistry with Mrs. Johnson 5th period"
 

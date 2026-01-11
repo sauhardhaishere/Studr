@@ -124,7 +124,7 @@ LATER
 
 ### Scenario 2: Just Started (Empty State)
 ```
-No tasks yet. Chat with Studr to get started!
+No tasks yet. Chat with Calendly to get started!
 ```
 
 ### Scenario 3: Only Today's Tasks

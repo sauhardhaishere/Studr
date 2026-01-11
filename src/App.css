@@ -117,7 +117,11 @@
   overflow: hidden;
   background: black;
   margin-right: 0;
-  /* Will adjust if we want to squeeze content, but overlay is better */
+  transition: margin-right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.main-content.chat-open {
+  margin-right: 380px;
 }
 
 .top-header {

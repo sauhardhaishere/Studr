@@ -1,74 +1,64 @@
 # Smart Test Chunking - Examples
 
-## How It Works
+## Test Preparation Chunking Examples
 
-When you tell Studr about a test with advance notice, the AI intelligently breaks down your study preparation into multiple manageable sessions. This prevents cramming and reduces burnout.
+When you tell Calendly about a test with advance notice, the AI intelligently breaks down your study preparation into multiple manageable sessions. This prevents cramming and reduces burnout.
 
-## Example 1: The Overwhelmed Athlete
+Here are some examples of how the AI handles different inputs:
 
-**User Input:**
-```
-"I have a Chem midterm in 2 weeks and I have practice every day until 6"
-```
+### Example 1: Standard Test Notice (1 Week Away)
 
-**Studr AI Response:**
-```
-"Got it! I've created a study plan for your Chem prep. Starting with reviewing notes, 
-then practice problems, and a mock test before the final review. You've got this!"
-```
+**User:** "I have a Math midterm in 1 week"
 
-**Created Tasks:**
-1. **Chem - Review Notes** - Tomorrow, 30 minutes (Medium Priority)
-2. **Chem - Practice Problems** - Next Monday, 45 minutes (Medium Priority)
-3. **Chem - Mock Test** - Next Wednesday, 45 minutes (High Priority)
-4. **Chem - Final Review** - Next Friday, 30 minutes (High Priority)
-5. **Chem Midterm** - Next Saturday, 45 minutes (High Priority)
+**Calendly AI Response:**
+"Got it! I've created a 5-day study plan for your Math midterm. Starting with reviewing notes, then practice problems, and a mock test before the final review. You've got this!"
 
-**Strategy:**
-- **Review Notes**: Start by reviewing your class notes and textbook
-- **Practice Problems**: Work through problem sets to apply concepts
-- **Mock Test**: Take a practice exam to identify weak areas
-- **Final Review**: Quick comprehensive review before the test
-- **Actual Test**: The midterm itself
+**New Tasks Created:**
+1. **Math - Review Notes** (Tomorrow, 30 min)
+2. **Math - Practice Problems** (Next Monday, 45 min)
+3. **Math - Mock Test** (Next Wednesday, 45 min)
+4. **Math - Final Review** (Next Friday, 30 min)
+5. **Math Midterm** (Next Saturday, 45 min)
 
-## Example 2: Biology Final
+---
 
-**User Input:**
-```
-"Biology final in 3 weeks"
-```
+### Example 2: Urgent Test (2 Days Away)
 
-**Studr AI Response:**
-```
-"Got it! I've created a study plan for your Biology prep. Starting with reviewing notes, 
-then practice problems, and a mock test before the final review. You've got this!"
-```
+**User:** "Wait, I just realized I have a Chem test on Wednesday!" (Sent on Monday)
 
-**Created Tasks:**
-1. **Biology - Review Notes** - Tomorrow, 30m
-2. **Biology - Practice Problems** - Next Monday, 45m
-3. **Biology - Mock Test** - Next Wednesday, 45m
-4. **Biology - Final Review** - Next Friday, 30m
-5. **Biology Final** - Next Saturday, 60m
+**Calendly AI Response:**
+"No problem! I've quickly added a focused study session for today and a final review for tomorrow to get you ready for that Chem test on Wednesday. Let's do this!"
 
-## Example 3: Quick Quiz (No Chunking)
+**New Tasks Created:**
+1. **Chem - Focused Prep** (Today, 45 min)
+2. **Chem - Final Review** (Tomorrow, 30 min)
+3. **Chem Test** (Wednesday, 45 min)
 
-**User Input:**
-```
-"Math quiz tomorrow"
-```
+---
 
-**Studr AI Response:**
-```
-"Perfect! I've added your Math Quiz for Tomorrow."
-```
+### Example 3: Long-term Planning (3 Weeks Away)
 
-**Created Tasks:**
-1. **Math Quiz** - Tomorrow, 45 minutes (High Priority)
+**User:** "I have a huge Bio final in 3 weeks"
 
-**Note:** No chunking because there's not enough advance time. The AI recognizes this is urgent and creates a single focused study session.
+**Calendly AI Response:**
+"A huge final deserves a solid plan! I've scheduled your Bio final in 3 weeks and mapped out 4 strategic study sessions starting next week so you can take it slow and steady. You're going to crush it!"
 
-## Key Features
+**New Tasks Created:**
+1. **Bio - Content Review** (In 1 week, 45 min)
+2. **Bio - Concept Mapping** (In 1.5 weeks, 45 min)
+3. **Bio - Practice Exam** (In 2 weeks, 1 hour)
+4. **Bio - Final Polish** (2 days before test, 30 min)
+5. **Bio Final** (In 3 weeks)
+
+---
+
+### Pro-Tips for Best Results:
+Just tell Calendly about your test naturally:
+- "History test next Friday"
+- "Spanish exam on the 20th"
+- "I have my Physics midterm in three weeks"
+
+The AI will handle the rest!
 
 ### Intelligent Scheduling
 - **Weekends**: Longer sessions (45 minutes) when you have more time

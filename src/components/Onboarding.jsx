@@ -3,7 +3,7 @@ import './Onboarding.css';
 
 const tutorialSteps = [
     {
-        title: "Welcome to Studr!",
+        title: "Welcome to Calendly!",
         body: "Let's take a quick tour to help you get organized. You can skip anytime.",
         targetId: null, // Center of screen
         position: 'center'
@@ -34,7 +34,7 @@ const tutorialSteps = [
     }
 ];
 
-export default function Onboarding({ onFinish }) {
+export default function Onboarding({ onFinish, isChatExpanded }) {
     const [step, setStep] = useState(0);
     const [coords, setCoords] = useState({ top: '50%', left: '50%' });
     const cardRef = useRef(null);
@@ -50,33 +50,36 @@ export default function Onboarding({ onFinish }) {
         if (el) {
             const rect = el.getBoundingClientRect();
             let newCoords = {};
+            const padding = 20;
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
 
             switch (currentData.position) {
                 case 'right':
                     newCoords = {
-                        top: rect.top + rect.height / 2,
-                        left: rect.right + 20,
+                        top: Math.max(padding, Math.min(viewportHeight - 200, rect.top + rect.height / 2)),
+                        left: Math.min(viewportWidth - 340, rect.right + 20),
                         transform: 'translateY(-50%)'
                     };
                     break;
                 case 'left':
                     newCoords = {
-                        top: rect.top + rect.height / 2,
-                        left: rect.left - 340,
+                        top: Math.max(padding, Math.min(viewportHeight - 200, rect.top + rect.height / 2)),
+                        left: Math.max(padding, rect.left - 340),
                         transform: 'translateY(-50%)'
                     };
                     break;
                 case 'bottom':
                     newCoords = {
                         top: rect.bottom + 20,
-                        left: rect.left + rect.width / 2,
+                        left: Math.max(160, Math.min(viewportWidth - 160, rect.left + rect.width / 2)),
                         transform: 'translateX(-50%)'
                     };
                     break;
                 case 'top':
                     newCoords = {
-                        top: rect.top - 200,
-                        left: rect.left + rect.width / 2,
+                        top: Math.max(padding, rect.top - 200),
+                        left: Math.max(160, Math.min(viewportWidth - 160, rect.left + rect.width / 2)),
                         transform: 'translateX(-50%)'
                     };
                     break;
@@ -92,13 +95,15 @@ export default function Onboarding({ onFinish }) {
     };
 
     useEffect(() => {
-        updatePosition();
+        // Use a small timeout to let the layout shift complete if needed
+        const timer = setTimeout(updatePosition, 100);
         window.addEventListener('resize', updatePosition);
         return () => {
+            clearTimeout(timer);
             window.removeEventListener('resize', updatePosition);
             document.querySelectorAll('.highlight-element').forEach(item => item.classList.remove('highlight-element'));
         };
-    }, [step]);
+    }, [step, isChatExpanded]);
 
     const handleNext = () => {
         if (step < tutorialSteps.length - 1) {
