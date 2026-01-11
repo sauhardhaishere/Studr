@@ -330,7 +330,7 @@ function App() {
                         const newTasksArray = [];
                         newTasksArray.push({
                           id: deadlineId,
-                          title: `${manualTask.subject ? manualTask.subject + ': ' : ''}${manualTask.title}`,
+                          title: `${(manualTask.subject === 'Other' && manualTask.customSubject) ? manualTask.customSubject + ': ' : (manualTask.subject && manualTask.subject !== 'Other' ? manualTask.subject + ': ' : '')}${manualTask.title}`,
                           time: deadlineDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + (manualTask.time > '12:00' ? (parseInt(manualTask.time.split(':')[0]) - 12) + ':' + manualTask.time.split(':')[1] + ' PM' : manualTask.time + ' AM'),
                           duration: '1h',
                           type: manualTask.type,
@@ -345,7 +345,7 @@ function App() {
                             if (reviewDate > new Date()) {
                               newTasksArray.push({
                                 id: crypto.randomUUID(),
-                                title: `${manualTask.subject || 'Test'} - ${label}`,
+                                title: `${(manualTask.subject === 'Other' ? manualTask.customSubject : manualTask.subject) || 'Test'} - ${label}`,
                                 time: reviewDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', 4:00 PM',
                                 duration: '45m',
                                 type: 'study',
@@ -364,11 +364,22 @@ function App() {
 
                 <div className="qa-divider"></div>
 
-                <select className="qa-select" value={manualTask.subject} onChange={e => setManualTask({ ...manualTask, subject: e.target.value })}>
-                  <option value="">Subject...</option>
-                  {schedule.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                  <option value="Other">Other</option>
-                </select>
+                {manualTask.subject === 'Other' ? (
+                  <input
+                    type="text"
+                    className="qa-input-main custom-subject-input"
+                    placeholder="Type subject..."
+                    autoFocus
+                    onBlur={(e) => { if (!e.target.value) setManualTask({ ...manualTask, subject: '' }) }}
+                    onChange={e => setManualTask({ ...manualTask, subject: 'Other', customSubject: e.target.value })}
+                  />
+                ) : (
+                  <select className="qa-select" value={manualTask.subject === 'Other' ? 'Other' : manualTask.subject} onChange={e => setManualTask({ ...manualTask, subject: e.target.value })}>
+                    <option value="">Subject...</option>
+                    {schedule.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    <option value="Other">Other</option>
+                  </select>
+                )}
 
                 <div className="qa-divider"></div>
 
@@ -397,7 +408,7 @@ function App() {
                   const newTasksArray = [];
                   newTasksArray.push({
                     id: deadlineId,
-                    title: `${manualTask.subject ? manualTask.subject + ': ' : ''}${manualTask.title}`,
+                    title: `${(manualTask.subject === 'Other' && manualTask.customSubject) ? manualTask.customSubject + ': ' : (manualTask.subject && manualTask.subject !== 'Other' ? manualTask.subject + ': ' : '')}${manualTask.title}`,
                     time: deadlineDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + (manualTask.time > '12:00' ? (parseInt(manualTask.time.split(':')[0]) - 12) + ':' + manualTask.time.split(':')[1] + ' PM' : manualTask.time + ' AM'),
                     duration: '1h',
                     type: manualTask.type,
