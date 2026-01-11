@@ -310,137 +310,6 @@ function App() {
                 <div className="stat-card"><span className="stat-val">87%</span><span className="stat-label">Goal</span></div>
                 <div className="stat-card"><span className="stat-val">{tasks.length}</span><span className="stat-label">Tasks</span></div>
               </div>
-
-              {/* Quick Add Bar */}
-              <div className="quick-add-bar">
-                <div className="quick-add-input-group">
-                  <span className="icon">⚡</span>
-                  <input
-                    type="text"
-                    className="qa-input-main"
-                    placeholder="Add a new test or assignment..."
-                    value={manualTask.title}
-                    onChange={e => setManualTask({ ...manualTask, title: e.target.value })}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        if (!manualTask.title || !manualTask.date) return;
-                        // Trigger Add Logic (Same as Modal)
-                        const deadlineId = crypto.randomUUID();
-                        // Default to tomorrow 8am if date not picked? No, let's enforce date or use today.
-                        const dVal = manualTask.date || new Date().toISOString().split('T')[0];
-                        const deadlineDate = new Date(dVal + 'T' + manualTask.time);
-
-                        const newTasksArray = [];
-                        newTasksArray.push({
-                          id: deadlineId,
-                          title: `${(manualTask.subject === 'Other' && manualTask.customSubject) ? manualTask.customSubject + ': ' : (manualTask.subject && manualTask.subject !== 'Other' ? manualTask.subject + ': ' : '')}${manualTask.title}`,
-                          time: deadlineDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + (manualTask.time > '12:00' ? (parseInt(manualTask.time.split(':')[0]) - 12) + ':' + manualTask.time.split(':')[1] + ' PM' : manualTask.time + ' AM'),
-                          duration: '1h',
-                          type: manualTask.type,
-                          priority: 'high',
-                          description: 'Quick Entry'
-                        });
-
-                        if (manualTask.type === 'task') {
-                          ['Final Review', 'Prep Session'].forEach((label, idx) => {
-                            const reviewDate = new Date(deadlineDate);
-                            reviewDate.setDate(deadlineDate.getDate() - (idx + 1));
-                            if (reviewDate > new Date()) {
-                              newTasksArray.push({
-                                id: crypto.randomUUID(),
-                                title: `${(manualTask.subject === 'Other' ? manualTask.customSubject : manualTask.subject) || 'Test'} - ${label}`,
-                                time: reviewDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', 4:00 PM',
-                                duration: '45m',
-                                type: 'study',
-                                priority: 'medium',
-                                description: 'Auto-generated study session'
-                              });
-                            }
-                          });
-                        }
-                        setTasks(prev => [...prev, ...newTasksArray]);
-                        setManualTask({ title: '', subject: '', date: '', time: '08:00', type: 'task' });
-                      }
-                    }}
-                  />
-                </div>
-
-                <div className="qa-divider"></div>
-
-                {manualTask.subject === 'Other' ? (
-                  <input
-                    type="text"
-                    className="qa-input-main custom-subject-input"
-                    placeholder="Type subject..."
-                    autoFocus
-                    onBlur={(e) => { if (!e.target.value) setManualTask({ ...manualTask, subject: '' }) }}
-                    onChange={e => setManualTask({ ...manualTask, subject: 'Other', customSubject: e.target.value })}
-                  />
-                ) : (
-                  <select className="qa-select" value={manualTask.subject === 'Other' ? 'Other' : manualTask.subject} onChange={e => setManualTask({ ...manualTask, subject: e.target.value })}>
-                    <option value="">Subject...</option>
-                    {schedule.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                    <option value="Other">Other</option>
-                  </select>
-                )}
-
-                <div className="qa-divider"></div>
-
-                <select className="qa-select" value={manualTask.type} onChange={e => setManualTask({ ...manualTask, type: e.target.value })}>
-                  <option value="task">Test</option>
-                  <option value="assignment">HW</option>
-                </select>
-
-                <div className="qa-divider"></div>
-
-                <input
-                  type="date"
-                  className="qa-date-picker"
-                  value={manualTask.date}
-                  onChange={e => setManualTask({ ...manualTask, date: e.target.value })}
-                />
-
-                <button className="qa-add-btn" onClick={() => {
-                  if (!manualTask.title || !manualTask.date) {
-                    alert("Please enter a title and date!");
-                    return;
-                  }
-                  const deadlineId = crypto.randomUUID();
-                  const deadlineDate = new Date(manualTask.date + 'T' + manualTask.time);
-
-                  const newTasksArray = [];
-                  newTasksArray.push({
-                    id: deadlineId,
-                    title: `${(manualTask.subject === 'Other' && manualTask.customSubject) ? manualTask.customSubject + ': ' : (manualTask.subject && manualTask.subject !== 'Other' ? manualTask.subject + ': ' : '')}${manualTask.title}`,
-                    time: deadlineDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + (manualTask.time > '12:00' ? (parseInt(manualTask.time.split(':')[0]) - 12) + ':' + manualTask.time.split(':')[1] + ' PM' : manualTask.time + ' AM'),
-                    duration: '1h',
-                    type: manualTask.type,
-                    priority: 'high',
-                    description: 'Quick Entry'
-                  });
-
-                  if (manualTask.type === 'task') {
-                    ['Final Review', 'Prep Session'].forEach((label, idx) => {
-                      const reviewDate = new Date(deadlineDate);
-                      reviewDate.setDate(deadlineDate.getDate() - (idx + 1));
-                      if (reviewDate > new Date()) {
-                        newTasksArray.push({
-                          id: crypto.randomUUID(),
-                          title: `${manualTask.subject || 'Test'} - ${label}`,
-                          time: reviewDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', 4:00 PM',
-                          duration: '45m',
-                          type: 'study',
-                          priority: 'medium',
-                          description: 'Auto-generated study session'
-                        });
-                      }
-                    });
-                  }
-                  setTasks(prev => [...prev, ...newTasksArray]);
-                  setManualTask({ title: '', subject: '', date: '', time: '08:00', type: 'task' });
-                }}>Add</button>
-              </div>
-
               {groupedTasks.overdue.length > 0 && (
                 <div className="dashboard-alerts">
                   {groupedTasks.overdue.map(t => (
@@ -506,45 +375,46 @@ function App() {
           {view === 'schedule' && <ScheduleView schedule={schedule} setSchedule={setSchedule} activities={activities} setActivities={setActivities} />}
         </div>
 
-        {editingTask && (
-          <div className="form-overlay">
-            <div className="add-block-form v2">
-              <h3>Edit Task</h3>
-              <form onSubmit={handleSaveEdit}>
-                <div className="form-field">
-                  <label>Title</label>
-                  <input
-                    type="text"
-                    value={editingTask.title}
-                    onChange={e => setEditingTask({ ...editingTask, title: e.target.value })}
-                  />
-                </div>
-                <div className="form-row">
+        {
+          editingTask && (
+            <div className="form-overlay">
+              <div className="add-block-form v2">
+                <h3>Edit Task</h3>
+                <form onSubmit={handleSaveEdit}>
                   <div className="form-field">
-                    <label>Time / Date</label>
+                    <label>Title</label>
                     <input
                       type="text"
-                      value={editingTask.time}
-                      onChange={e => setEditingTask({ ...editingTask, time: e.target.value })}
+                      value={editingTask.title}
+                      onChange={e => setEditingTask({ ...editingTask, title: e.target.value })}
                     />
                   </div>
-                  <div className="form-field">
-                    <label>Duration</label>
-                    <input
-                      type="text"
-                      value={editingTask.duration}
-                      onChange={e => setEditingTask({ ...editingTask, duration: e.target.value })}
-                    />
+                  <div className="form-row">
+                    <div className="form-field">
+                      <label>Time / Date</label>
+                      <input
+                        type="text"
+                        value={editingTask.time}
+                        onChange={e => setEditingTask({ ...editingTask, time: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label>Duration</label>
+                      <input
+                        type="text"
+                        value={editingTask.duration}
+                        onChange={e => setEditingTask({ ...editingTask, duration: e.target.value })}
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="form-actions">
-                  <button type="button" className="cancel-btn" onClick={() => setEditingTask(null)}>Cancel</button>
-                  <button type="submit" className="save-btn">Save Changes</button>
-                </div>
-              </form>
+                  <div className="form-actions">
+                    <button type="button" className="cancel-btn" onClick={() => setEditingTask(null)}>Cancel</button>
+                    <button type="submit" className="save-btn">Save Changes</button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
-        )}
+          )}
         {isAddingTask && (
           <div className="form-overlay">
             <div className="add-block-form v2">
@@ -663,7 +533,7 @@ function App() {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   )
 }
 
