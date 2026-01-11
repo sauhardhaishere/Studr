@@ -131,12 +131,38 @@ export default function Onboarding({ onFinish, isChatExpanded, schedule = [], ac
         // Use a small timeout to let the layout shift complete
         const timer = setTimeout(updatePosition, 100);
         window.addEventListener('resize', updatePosition);
+
+        // MutationObserver to watch for modal appearance
+        const observer = new MutationObserver((mutations) => {
+            const hasModalChange = mutations.some(m =>
+                Array.from(m.addedNodes).some(n => n.id === 'class-form' || n.id === 'routine-form') ||
+                Array.from(m.removedNodes).some(n => n.id === 'class-form' || n.id === 'routine-form')
+            );
+            if (hasModalChange) updatePosition();
+        });
+
+        observer.observe(document.body, { childList: true, subtree: true });
+
         return () => {
             clearTimeout(timer);
             window.removeEventListener('resize', updatePosition);
+            observer.disconnect();
             document.querySelectorAll('.highlight-element').forEach(item => item.classList.remove('highlight-element'));
         };
     }, [step, isChatExpanded, schedule.length, activities.length, setView]);
+
+    // Auto-advance logic
+    useEffect(() => {
+        const currentData = tutorialSteps[step];
+        if (currentData.require === 'schedule' && schedule.length > 0) {
+            const timer = setTimeout(() => handleNext(), 800);
+            return () => clearTimeout(timer);
+        }
+        if (currentData.require === 'activities' && activities.length > 0) {
+            const timer = setTimeout(() => handleNext(), 800);
+            return () => clearTimeout(timer);
+        }
+    }, [schedule.length, activities.length, step]);
 
     const handleNext = () => {
         if (step < tutorialSteps.length - 1) {
@@ -156,6 +182,9 @@ export default function Onboarding({ onFinish, isChatExpanded, schedule = [], ac
     const isLocked = (currentStep.require === 'schedule' && schedule.length === 0) ||
         (currentStep.require === 'activities' && activities.length === 0);
 
+    const isSuccess = (currentStep.require === 'schedule' && schedule.length > 0) ||
+        (currentStep.require === 'activities' && activities.length > 0);
+
     return (
         <div className="tutorial-overlay">
             <div
@@ -164,12 +193,16 @@ export default function Onboarding({ onFinish, isChatExpanded, schedule = [], ac
                 style={coords}
             >
                 <div className="tutorial-header">
-                    <div className="tutorial-icon">{isLocked ? '🔒' : '✨'}</div>
-                    <div className="tutorial-title">{currentStep.title}</div>
+                    <div className="tutorial-icon">
+                        {isSuccess ? '🏆' : (isLocked ? '🔒' : '✨')}
+                    </div>
+                    <div className="tutorial-title">
+                        {isSuccess ? 'Great Job!' : currentStep.title}
+                    </div>
                 </div>
                 <div className="tutorial-body">
-                    {currentStep.body}
-                    {isLocked && (
+                    {isSuccess ? "That's it! Moving you to the next step..." : currentStep.body}
+                    {isLocked && !isSuccess && (
                         <div style={{ color: '#ffb300', fontSize: '0.8rem', marginTop: '12px', fontWeight: '600' }}>
                             ⚠️ Please add at least one to continue.
                         </div>

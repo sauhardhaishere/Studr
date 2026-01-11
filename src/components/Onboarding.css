@@ -22,7 +22,7 @@
     flex-direction: column;
     gap: 16px;
     animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    z-index: 2100;
+    z-index: 2200;
 }
 
 /* Arrow for the box */
@@ -144,7 +144,7 @@
 
 .highlight-element {
     position: relative;
-    z-index: 2050 !important;
+    z-index: 2150 !important;
     box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.4), 0 0 20px rgba(99, 102, 241, 0.2);
     pointer-events: auto;
     border-radius: 8px;
