@@ -1205,11 +1205,13 @@
   justify-content: space-between;
   align-items: flex-start;
   transition: all 0.2s;
+  cursor: pointer;
 }
 
 .time-block:hover {
   background: #1a1a1a;
-  border-color: #333;
+  border-color: #444;
+  transform: translateX(4px);
 }
 
 .time-block.class {
@@ -1231,6 +1233,7 @@
   background: rgba(255, 255, 255, 0.05);
   opacity: 1;
   border-color: #555;
+  transform: translateX(4px);
 }
 
 .unmapped-gap .block-name {

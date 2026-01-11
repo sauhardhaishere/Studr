@@ -146,7 +146,7 @@
     position: relative;
     z-index: 2050 !important;
     box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.4), 0 0 20px rgba(99, 102, 241, 0.2);
-    pointer-events: none;
+    pointer-events: auto;
     border-radius: 8px;
     transition: all 0.3s ease;
 }
