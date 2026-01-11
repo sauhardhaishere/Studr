@@ -41,6 +41,9 @@ body {
   line-height: 1.5;
   overflow-x: hidden;
   min-height: 100vh;
+  margin: 0;
+  display: flex !important;
+  flex-direction: column;
 }
 
 button {
