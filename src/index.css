@@ -28,10 +28,15 @@
   /* Remove blur for stark B&W logic, or keep subtle. Let's keep it clean. */
 }
 
-* {
-  box-sizing: border-box;
+/* Global Resets for Full Height */
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
   margin: 0;
   padding: 0;
+  overflow-x: hidden;
 }
 
 body {
@@ -39,10 +44,7 @@ body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.5;
-  overflow-x: hidden;
-  min-height: 100vh;
-  margin: 0;
-  display: flex !important;
+  display: flex;
   flex-direction: column;
 }
 
