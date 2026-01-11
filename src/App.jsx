@@ -295,13 +295,17 @@ function App() {
           </div>
           <div className="header-actions">
             {lastSaved && <span className="save-indicator">Saved {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
-            {lastSaved && <span className="save-indicator">Saved {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
           </div>
         </header>
 
         <div className="view-container">
           {view === 'home' && (
             <div className="dashboard-grid">
+              <div className="schedule-actions-row">
+                <button className="add-class-pill main" onClick={() => setIsAddingTask(true)}>
+                  + Add New Task
+                </button>
+              </div>
               <div className="stats-row">
                 <div className="stat-card"><span className="stat-val">87%</span><span className="stat-label">Goal</span></div>
                 <div className="stat-card"><span className="stat-val">{tasks.length}</span><span className="stat-label">Tasks</span></div>
@@ -557,6 +561,15 @@ function App() {
                     {schedule.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     <option value="Other">Other (Type below)</option>
                   </select>
+                  {manualTask.subject === 'Other' && (
+                    <input
+                      type="text"
+                      placeholder="Type custom subject..."
+                      style={{ marginTop: '8px', width: '100%', background: 'black', border: '1px solid #333', color: 'white', padding: '12px', borderRadius: '4px' }}
+                      value={manualTask.customSubject || ''}
+                      onChange={e => setManualTask({ ...manualTask, customSubject: e.target.value })}
+                    />
+                  )}
                 </div>
               </div>
               <div className="form-row">
@@ -586,14 +599,15 @@ function App() {
                   const deadlineDate = new Date(manualTask.date + 'T' + manualTask.time);
 
                   const newTasksArray = [];
+                  const displaySubject = manualTask.subject === 'Other' ? manualTask.customSubject : manualTask.subject;
 
                   // 1. The Main Deadline Task
                   newTasksArray.push({
                     id: deadlineId,
-                    title: `${manualTask.subject ? manualTask.subject + ': ' : ''}${manualTask.title}`,
+                    title: `${displaySubject ? displaySubject + ': ' : ''}${manualTask.title}`,
                     time: deadlineDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + (manualTask.time > '12:00' ? (parseInt(manualTask.time.split(':')[0]) - 12) + ':' + manualTask.time.split(':')[1] + ' PM' : manualTask.time + ' AM'),
                     duration: '1h',
-                    type: 'task',
+                    type: manualTask.type, // Use selected type
                     priority: 'high',
                     description: 'Manual Entry'
                   });
@@ -606,7 +620,7 @@ function App() {
                       if (reviewDate > new Date()) {
                         newTasksArray.push({
                           id: crypto.randomUUID(),
-                          title: `${manualTask.subject || 'Test'} - ${label}`,
+                          title: `${displaySubject || 'Test'} - ${label}`,
                           time: reviewDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', 4:00 PM',
                           duration: '45m',
                           type: 'study',
