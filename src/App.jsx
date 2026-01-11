@@ -1,0 +1,356 @@
+import { useState, useRef, useEffect } from 'react'
+import './App.css'
+import { simulateAIAnalysis } from './utils/aiMock'
+import { categorizeTask, getTaskDateValue } from './utils/dateUtils'
+import CalendarView from './components/CalendarView'
+import ScheduleView from './components/ScheduleView'
+import { supabase } from './lib/supabase'
+import Auth from './components/Auth'
+
+/* Icons */
+const HomeIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+)
+const CalendarIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+)
+const ScheduleIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><line x1="8" y1="14" x2="8" y2="14"></line><line x1="12" y1="14" x2="12" y2="14"></line><line x1="16" y1="14" x2="16" y2="14"></line><line x1="8" y1="18" x2="8" y2="18"></line><line x1="12" y1="18" x2="12" y2="18"></line><line x1="16" y1="18" x2="16" y2="18"></line></svg>
+)
+const SendIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+)
+const LogoIcon = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+  </svg>
+)
+const ChevronLeft = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+)
+const ChevronRight = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+)
+
+function App() {
+  const [session, setSession] = useState(null);
+  const [view, setView] = useState('home');
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+  const [tasks, setTasks] = useState(() => {
+    const saved = localStorage.getItem('studr_tasks');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [schedule, setSchedule] = useState(() => {
+    const saved = localStorage.getItem('studr_schedule');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [activities, setActivities] = useState(() => {
+    const saved = localStorage.getItem('studr_activities');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [chatHistory, setChatHistory] = useState(() => {
+    const saved = localStorage.getItem('studr_chat');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [input, setInput] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isChatExpanded, setIsChatExpanded] = useState(true);
+  const [lastSaved, setLastSaved] = useState(null);
+  const [editingTask, setEditingTask] = useState(null);
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem('studr_tasks', JSON.stringify(tasks));
+    setLastSaved(new Date());
+  }, [tasks]);
+
+  useEffect(() => {
+    localStorage.setItem('studr_schedule', JSON.stringify(schedule));
+    setLastSaved(new Date());
+  }, [schedule]);
+
+  useEffect(() => {
+    localStorage.setItem('studr_activities', JSON.stringify(activities));
+    setLastSaved(new Date());
+  }, [activities]);
+
+  useEffect(() => {
+    localStorage.setItem('studr_chat', JSON.stringify(chatHistory));
+    setLastSaved(new Date());
+  }, [chatHistory]);
+
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollTop = chatEndRef.current.scrollHeight;
+    }
+  }, [chatHistory, isProcessing]);
+
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    try {
+      const userMsg = input;
+      setInput('');
+      setIsProcessing(true);
+      const updatedHistory = [...chatHistory, { author: 'user', text: userMsg }];
+      setChatHistory(updatedHistory);
+
+      const fullContext = updatedHistory.slice(-5)
+        .map(msg => `${msg.author === 'user' ? 'User' : 'Studr'}: ${msg.text}`)
+        .join('\n');
+
+      let result = null;
+      try {
+        const { generateScheduleFromAI } = await import('./utils/aiReal');
+        result = await generateScheduleFromAI(fullContext, tasks, activities, schedule, new Date());
+      } catch (aiErr) {
+        console.error("AI failed");
+      }
+
+      if (!result) {
+        result = await simulateAIAnalysis(fullContext, tasks, activities, schedule, new Date());
+      }
+
+      const incomingTasks = result.newTasks || result.generatedSchedule || [];
+      const incomingClasses = result.newClasses || [];
+      const incomingActivities = result.newActivities || [];
+
+      if (incomingTasks.length > 0) {
+        const newTasksWithIds = incomingTasks.map((t, idx) => ({
+          ...t,
+          id: Date.now() + idx + Math.random(),
+          completed: false,
+          type: t.type || 'study'
+        }));
+        setTasks(prev => [...newTasksWithIds, ...prev]);
+      }
+      if (incomingClasses.length > 0) {
+        const newClassesWithIds = incomingClasses.map((c, idx) => ({ ...c, id: Date.now() + idx + Math.random(), type: 'class' }));
+        setSchedule(prev => [...prev, ...newClassesWithIds]);
+      }
+      if (incomingActivities.length > 0) {
+        const newActivitiesWithIds = incomingActivities.map((a, idx) => ({ ...a, id: Date.now() + idx + Math.random(), type: 'activity' }));
+        setActivities(prev => [...prev, ...newActivitiesWithIds]);
+      }
+
+      setChatHistory(prev => [...prev, { author: 'ai', text: result.message }]);
+    } catch (error) {
+      console.error("Critical error:", error);
+      setChatHistory(prev => [...prev, { author: 'ai', text: "I'm having trouble processing that. Can you try again?" }]);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSaveEdit = (e) => {
+    e.preventDefault();
+    setTasks(prev => prev.map(t => t.id === editingTask.id ? editingTask : t));
+    setEditingTask(null);
+  };
+
+  const sortedTasks = [...tasks].sort((a, b) => getTaskDateValue(a) - getTaskDateValue(b));
+  const groupedTasks = {
+    overdue: sortedTasks.filter(t => categorizeTask(t) === 'overdue'),
+    today: sortedTasks.filter(t => categorizeTask(t) === 'today'),
+    thisWeek: sortedTasks.filter(t => categorizeTask(t) === 'thisWeek'),
+    nextWeek: sortedTasks.filter(t => categorizeTask(t) === 'nextWeek'),
+    later: sortedTasks.filter(t => categorizeTask(t) === 'later')
+  };
+
+  const sections = [
+    { key: 'overdue', title: 'Undone / Overdue', tasks: groupedTasks.overdue, isOverdue: true },
+    { key: 'today', title: 'Today', tasks: groupedTasks.today },
+    { key: 'thisWeek', title: 'This Week', tasks: groupedTasks.thisWeek },
+    { key: 'nextWeek', title: 'Next Week', tasks: groupedTasks.nextWeek },
+    { key: 'later', title: 'Later', tasks: groupedTasks.later }
+  ];
+
+  if (!session) {
+    return <Auth />;
+  }
+
+  return (
+    <div className="layout-grid">
+      <aside className="sidebar">
+        <div className="logo-area"><LogoIcon /></div>
+        <nav className="nav-menu">
+          <button className={`nav-item ${view === 'home' ? 'active' : ''}`} onClick={() => setView('home')}><HomeIcon /></button>
+          <button className={`nav-item ${view === 'calendar' ? 'active' : ''}`} onClick={() => setView('calendar')}><CalendarIcon /></button>
+          <button className={`nav-item ${view === 'schedule' ? 'active' : ''}`} onClick={() => setView('schedule')}><ScheduleIcon /></button>
+        </nav>
+        <div className="user-profile-mini">
+          <div className="avatar small">{session.user.email[0].toUpperCase()}</div>
+          <button className="logout-btn" onClick={() => supabase.auth.signOut()} title="Logout">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </button>
+        </div>
+      </aside>
+
+      <main className="main-content">
+        <header className="top-header">
+          <div className="header-text">
+            <h1>{view === 'home' ? `Good Afternoon, ${session.user.email.split('@')[0]}` : view === 'calendar' ? 'Your Schedule' : 'My Classes'}</h1>
+            <p className="subtitle">{tasks.length} tasks remaining.</p>
+          </div>
+          <div className="header-actions">
+            {lastSaved && <span className="save-indicator">Saved {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+            <button className="icon-btn notification-btn">🔔</button>
+          </div>
+        </header>
+
+        <div className="view-container">
+          {view === 'home' && (
+            <div className="dashboard-grid">
+              <div className="stats-row">
+                <div className="stat-card"><span className="stat-val">87%</span><span className="stat-label">Goal</span></div>
+                <div className="stat-card"><span className="stat-val">{tasks.length}</span><span className="stat-label">Tasks</span></div>
+                <div className="stat-card"><span className="stat-val">8h</span><span className="stat-label">Sleep</span></div>
+              </div>
+
+              {groupedTasks.overdue.length > 0 && (
+                <div className="dashboard-alerts">
+                  {groupedTasks.overdue.map(t => (
+                    <div key={t.id} className="alert-card">
+                      <div className="alert-icon">⚠️</div>
+                      <div className="alert-content">
+                        <div className="alert-title">Task Overdue</div>
+                        <div className="alert-text">"{t.title}" was due {t.time}.</div>
+                      </div>
+                      <button className="done-btn" onClick={() => setTasks(prev => prev.filter(tk => tk.id !== t.id))}>Done</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="timeline-section">
+                {sections.map(section => (
+                  section.tasks.length > 0 && (
+                    <div key={section.key} className={`timeline-group ${section.isOverdue ? 'overdue-section' : ''}`}>
+                      <h3 className={`timeline-group-header ${section.isOverdue ? 'overdue' : ''}`}>{section.title}</h3>
+                      <div className="tasks-list">
+                        {section.tasks.map((task, idx) => (
+                          <div key={task.id} className={`task-card ${section.isOverdue ? 'overdue' : (task.priority === 'high' ? 'high-priority' : 'medium-priority')}`}>
+                            <div className="task-main">
+                              <div className="task-top">
+                                <span className="task-title-text">{task.title}</span>
+                                <div className="task-badges">
+                                  {task.type === 'task' && <span className="badge badge-deadline">Deadline</span>}
+                                  {task.priority === 'high' && <span className="badge badge-high">High</span>}
+                                </div>
+                              </div>
+                              <div className="task-details">
+                                <span className="task-time">{task.time}</span>
+                                <span>•</span>
+                                <span className="task-duration">{task.duration}</span>
+                              </div>
+                              {task.description && <p className="task-description">{task.description}</p>}
+                              {task.resources && task.resources.length > 0 && (
+                                <div className="task-resources">
+                                  {task.resources.map((res, i) => (
+                                    <a key={i} href={res.url} target="_blank" rel="noopener noreferrer" className="resource-link">
+                                      <span className="res-icon">🔗</span> {res.label}
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div className="task-actions">
+                              <button className="edit-task-btn" onClick={() => setEditingTask({ ...task })}>Edit</button>
+                              <button className="done-btn" onClick={() => setTasks(prev => prev.filter(t => t.id !== task.id))}>Done</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                ))}
+              </div>
+            </div>
+          )}
+
+          {view === 'calendar' && <CalendarView tasks={tasks} />}
+          {view === 'schedule' && <ScheduleView schedule={schedule} setSchedule={setSchedule} activities={activities} setActivities={setActivities} />}
+        </div>
+
+        {editingTask && (
+          <div className="form-overlay">
+            <div className="add-block-form v2">
+              <h3>Edit Task</h3>
+              <form onSubmit={handleSaveEdit}>
+                <div className="form-field">
+                  <label>Title</label>
+                  <input
+                    type="text"
+                    value={editingTask.title}
+                    onChange={e => setEditingTask({ ...editingTask, title: e.target.value })}
+                  />
+                </div>
+                <div className="form-row">
+                  <div className="form-field">
+                    <label>Time / Date</label>
+                    <input
+                      type="text"
+                      value={editingTask.time}
+                      onChange={e => setEditingTask({ ...editingTask, time: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>Duration</label>
+                    <input
+                      type="text"
+                      value={editingTask.duration}
+                      onChange={e => setEditingTask({ ...editingTask, duration: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="form-actions">
+                  <button type="button" className="cancel-btn" onClick={() => setEditingTask(null)}>Cancel</button>
+                  <button type="submit" className="save-btn">Save Changes</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </main>
+
+      <div className={`chat-panel ${!isChatExpanded ? 'minimized' : ''}`}>
+        <div className="chat-toggle-tab" onClick={() => setIsChatExpanded(!isChatExpanded)}>
+          {isChatExpanded ? <ChevronRight /> : <ChevronLeft />}
+        </div>
+        <div className="chat-content-area is-scrollable" ref={chatEndRef}>
+          {chatHistory.length === 0 ? <div className="chat-empty-state">Ask Studr...</div> : (
+            chatHistory.map((msg, idx) => (
+              <div key={idx} className={`chat-bubble ${msg.author}`}>
+                {msg.author === 'ai' && <span className="chat-avatar">🤖</span>}
+                <div className="bubble-content">{msg.text}</div>
+              </div>
+            ))
+          )}
+          {isProcessing && <div className="chat-bubble ai"><span className="chat-avatar">...</span><div className="bubble-content">Thinking...</div></div>}
+        </div>
+        <div className="chat-input-area">
+          <div className="ai-input-bar">
+            <input type="text" placeholder="Type a message..." value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} disabled={isProcessing} />
+            <button className={`send-action ${input ? 'active' : ''}`} onClick={handleSend}>{isProcessing ? '...' : <SendIcon />}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default App

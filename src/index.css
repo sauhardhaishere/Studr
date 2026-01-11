@@ -1,0 +1,124 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Monochrome Theme */
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-tertiary: #111111;
+
+  --border-dim: #222222;
+  --border-light: #333333;
+
+  --accent-base: #ffffff;
+  --accent-glow: #ffffff;
+  --accent-violet: #888888;
+  /* Demoted to gray */
+
+  --danger: #ffffff;
+  /* Stylized danger as white or distinct gray pattern typically, but user asked for B&W. Let's keep it white with generic borders? Or maybe just simple white. For usability, I'll keep distinct brightness or borders, but let's stick to the prompt's "Black and White". strictly B&W might be too hard, so grayscale is better. */
+
+  /* Re-mapping for High Contrast B&W */
+  --text-primary: #ffffff;
+  --text-secondary: #888888;
+  --text-tertiary: #555555;
+
+  --glass-bg: rgba(0, 0, 0, 0.8);
+  --glass-border: #333333;
+  --glass-blur: 0px;
+  /* Remove blur for stark B&W logic, or keep subtle. Let's keep it clean. */
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+
+/* Utilities */
+.glass-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-dim);
+  border-radius: 12px;
+  /* No shadows in strict B&W usually, or very subtle */
+}
+
+.gradient-text {
+  background: white;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: white;
+  /* Fallback */
+}
+
+.btn-primary {
+  background: white;
+  color: black;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+
+.btn-primary:hover {
+  opacity: 0.8;
+}
+
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+/* Badges - Monochrome */
+.badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid white;
+}
+
+.badge-high {
+  background: white;
+  color: black;
+}
+
+.badge-med {
+  background: transparent;
+  color: white;
+  border-color: #777;
+}
+
+/* Animations */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s ease-out forwards;
+}
