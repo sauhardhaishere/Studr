@@ -59,8 +59,7 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - **CEILING:** All study tasks MUST have an index strictly LESS than the DEADLINE_INDEX if the test is in the morning.
        - **CRAMMING PROTECTION:** Maximum ONE study session per day. 
        - **SPREAD THE LOAD:** Do not skip days leading up to the test if the timeline is short (< 5 days). Use every available day (Index 0, 1, 2...).
-    
-    5. **STUDR 7-DAY COUNTDOWN PROTOCOL (ADAPTIVE):**
+    5. **CALENDLY 7-DAY COUNTDOWN PROTOCOL (ADAPTIVE):**
        Follow this cadence based on the remaining days:
        - **7+ Days away:** Use the standard cadence (T-7 Setup, T-5 Study, T-3 Review, T-1 Final).
        - **3-5 Days away:** Compress the schedule. Use every day. (e.g., Sun: Setup/Sec 1, Mon: Sec 2, Tue: Final Review).
