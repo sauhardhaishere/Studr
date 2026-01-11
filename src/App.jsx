@@ -50,22 +50,10 @@ function App() {
 
     return () => subscription.unsubscribe();
   }, []);
-  const [tasks, setTasks] = useState(() => {
-    const saved = localStorage.getItem('calendly_tasks');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [schedule, setSchedule] = useState(() => {
-    const saved = localStorage.getItem('calendly_schedule');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [activities, setActivities] = useState(() => {
-    const saved = localStorage.getItem('calendly_activities');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [chatHistory, setChatHistory] = useState(() => {
-    const saved = localStorage.getItem('calendly_chat');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [tasks, setTasks] = useState([]);
+  const [schedule, setSchedule] = useState([]);
+  const [activities, setActivities] = useState([]);
+  const [chatHistory, setChatHistory] = useState([]);
 
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -74,24 +62,93 @@ function App() {
   const [editingTask, setEditingTask] = useState(null);
   const chatEndRef = useRef(null);
 
-  useEffect(() => {
-    localStorage.setItem('calendly_tasks', JSON.stringify(tasks));
-    setLastSaved(new Date());
-  }, [tasks]);
+  /* --- SUPABASE SYNC LOGIC --- */
 
+  // 1. Fetch all data on load
   useEffect(() => {
-    localStorage.setItem('calendly_schedule', JSON.stringify(schedule));
-    setLastSaved(new Date());
-  }, [schedule]);
+    if (!session) return;
+    const fetchData = async () => {
+      // Fetch Tasks
+      const { data: t } = await supabase.from('tasks').select('*');
+      if (t) setTasks(t);
 
+      // Fetch Classes
+      const { data: c } = await supabase.from('classes').select('*');
+      if (c) setSchedule(c);
+
+      // Fetch Activities
+      const { data: a } = await supabase.from('activities').select('*');
+      if (a) setActivities(a);
+    };
+    fetchData();
+  }, [session]);
+
+  // 2. Save Tasks (Debounced/Immediate)
   useEffect(() => {
-    localStorage.setItem('calendly_activities', JSON.stringify(activities));
-    setLastSaved(new Date());
-  }, [activities]);
+    if (!session || tasks.length === 0) return;
+    const saveTasks = async () => {
+      const uId = session.user.id;
+      const validTasks = tasks.map(t => ({
+        id: t.id,
+        user_id: uId,
+        title: t.title,
+        time: t.time,
+        duration: t.duration,
+        type: t.type,
+        priority: t.priority,
+        description: t.description || '',
+        resources: t.resources || []
+      }));
+      await supabase.from('tasks').upsert(validTasks);
+      setLastSaved(new Date());
+    };
+    const timer = setTimeout(saveTasks, 2000);
+    return () => clearTimeout(timer);
+  }, [tasks, session]);
 
+  // 3. Save Schedule (Classes)
+  useEffect(() => {
+    if (!session || schedule.length === 0) return;
+    const saveSchedule = async () => {
+      const uId = session.user.id;
+      const validClasses = schedule.map(c => ({
+        id: c.id,
+        user_id: uId,
+        name: c.name,
+        subject: c.subject
+      }));
+      await supabase.from('classes').upsert(validClasses);
+      setLastSaved(new Date());
+    };
+    const timer = setTimeout(saveSchedule, 2000);
+    return () => clearTimeout(timer);
+  }, [schedule, session]);
+
+  // 4. Save Activities
+  useEffect(() => {
+    if (!session || activities.length === 0) return;
+    const saveActivities = async () => {
+      const uId = session.user.id;
+      const validActivities = activities.map(a => ({
+        id: a.id,
+        user_id: uId,
+        name: a.name,
+        time: a.time,
+        frequency: a.frequency,
+        applied_days: a.appliedDays || [],
+        type: a.type,
+        is_free_slot: a.isFreeSlot
+      }));
+      await supabase.from('activities').upsert(validActivities);
+      setLastSaved(new Date());
+    };
+    const timer = setTimeout(saveActivities, 2000);
+    return () => clearTimeout(timer);
+  }, [activities, session]);
+
+  // 5. Save Chat (Optional - LocalStorage for now to save DB space)
   useEffect(() => {
     localStorage.setItem('calendly_chat', JSON.stringify(chatHistory));
-    setLastSaved(new Date());
   }, [chatHistory]);
 
   useEffect(() => {
