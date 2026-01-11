@@ -1,5 +1,7 @@
 /* Auth Container - Centered Flexbox */
 .auth-container {
+    flex: 1;
+    width: 100%;
     min-height: 100vh;
     display: flex;
     align-items: center;
@@ -10,6 +12,7 @@
     color: white;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     padding: 20px;
+    margin: 0;
 }
 
 /* Background - Pure Black */
