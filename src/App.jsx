@@ -84,23 +84,34 @@ function App() {
   }, [session]);
 
   // 2. Save Tasks (Debounced/Immediate)
+  // 2. Save Tasks
   useEffect(() => {
     if (!session || tasks.length === 0) return;
     const saveTasks = async () => {
-      const uId = session.user.id;
-      const validTasks = tasks.map(t => ({
-        id: t.id,
-        user_id: uId,
-        title: t.title,
-        time: t.time,
-        duration: t.duration,
-        type: t.type,
-        priority: t.priority,
-        description: t.description || '',
-        resources: t.resources || []
-      }));
-      await supabase.from('tasks').upsert(validTasks);
-      setLastSaved(new Date());
+      try {
+        const uId = session.user.id;
+        const validTasks = tasks.map(t => {
+          // Ensure ID is a valid UUID or let Supabase generate one if it looks like a timestamp
+          const isTimestampId = typeof t.id === 'number' || (typeof t.id === 'string' && !t.id.includes('-'));
+          return {
+            ...(isTimestampId ? {} : { id: t.id }), // Only include ID if it looks like a UUID
+            user_id: uId,
+            title: t.title,
+            time: t.time,
+            duration: t.duration,
+            type: t.type,
+            priority: t.priority,
+            description: t.description || '',
+            resources: t.resources || []
+          };
+        });
+
+        const { error } = await supabase.from('tasks').upsert(validTasks);
+        if (error) console.error("Error saving tasks:", error);
+        else setLastSaved(new Date());
+      } catch (err) {
+        console.error("Save tasks crash:", err);
+      }
     };
     const timer = setTimeout(saveTasks, 2000);
     return () => clearTimeout(timer);
@@ -110,15 +121,23 @@ function App() {
   useEffect(() => {
     if (!session || schedule.length === 0) return;
     const saveSchedule = async () => {
-      const uId = session.user.id;
-      const validClasses = schedule.map(c => ({
-        id: c.id,
-        user_id: uId,
-        name: c.name,
-        subject: c.subject
-      }));
-      await supabase.from('classes').upsert(validClasses);
-      setLastSaved(new Date());
+      try {
+        const uId = session.user.id;
+        const validClasses = schedule.map(c => {
+          const isTimestampId = typeof c.id === 'number' || (typeof c.id === 'string' && !c.id.includes('-'));
+          return {
+            ...(isTimestampId ? {} : { id: c.id }),
+            user_id: uId,
+            name: c.name,
+            subject: c.subject
+          };
+        });
+        const { error } = await supabase.from('classes').upsert(validClasses);
+        if (error) console.error("Error saving classes:", error);
+        else setLastSaved(new Date());
+      } catch (err) {
+        console.error("Save classes crash:", err);
+      }
     };
     const timer = setTimeout(saveSchedule, 2000);
     return () => clearTimeout(timer);
@@ -128,19 +147,27 @@ function App() {
   useEffect(() => {
     if (!session || activities.length === 0) return;
     const saveActivities = async () => {
-      const uId = session.user.id;
-      const validActivities = activities.map(a => ({
-        id: a.id,
-        user_id: uId,
-        name: a.name,
-        time: a.time,
-        frequency: a.frequency,
-        applied_days: a.appliedDays || [],
-        type: a.type,
-        is_free_slot: a.isFreeSlot
-      }));
-      await supabase.from('activities').upsert(validActivities);
-      setLastSaved(new Date());
+      try {
+        const uId = session.user.id;
+        const validActivities = activities.map(a => {
+          const isTimestampId = typeof a.id === 'number' || (typeof a.id === 'string' && !a.id.includes('-'));
+          return {
+            ...(isTimestampId ? {} : { id: a.id }),
+            user_id: uId,
+            name: a.name,
+            time: a.time,
+            frequency: a.frequency,
+            applied_days: a.appliedDays || [],
+            type: a.type,
+            is_free_slot: a.isFreeSlot
+          };
+        });
+        const { error } = await supabase.from('activities').upsert(validActivities);
+        if (error) console.error("Error saving activities:", error);
+        else setLastSaved(new Date());
+      } catch (err) {
+        console.error("Save activities crash:", err);
+      }
     };
     const timer = setTimeout(saveActivities, 2000);
     return () => clearTimeout(timer);
