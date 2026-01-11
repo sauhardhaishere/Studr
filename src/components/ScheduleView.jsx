@@ -113,10 +113,10 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities }) => {
         <div className="schedule-view-v2">
             {/* Simplified Header with All Actions */}
             <div className="schedule-actions-row">
-                <button className="add-class-pill main" onClick={() => setIsAddingClass(true)}>
+                <button id="add-class-btn" className="add-class-pill main" onClick={() => setIsAddingClass(true)}>
                     + Add New Class
                 </button>
-                <button className="add-block-btn" onClick={() => setIsAddingBlock(true)}>
+                <button id="add-routine-btn" className="add-block-btn" onClick={() => setIsAddingBlock(true)}>
                     + Add Routine Block
                 </button>
             </div>

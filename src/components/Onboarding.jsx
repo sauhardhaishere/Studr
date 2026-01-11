@@ -5,42 +5,58 @@ const tutorialSteps = [
     {
         title: "Welcome to Calendly!",
         body: "Let's take a quick tour to help you get organized. You can skip anytime.",
-        targetId: null, // Center of screen
+        targetId: null,
         position: 'center'
     },
     {
-        title: "Manage Classes",
-        body: "Add your subjects and schedule here. This helps the AI know when you're busy.",
+        title: "The Heart of Calendly",
+        body: "First, let's head over to your Schedule tab to set up your week.",
         targetId: 'nav-schedule',
-        position: 'right'
+        position: 'right',
+        view: 'schedule'
     },
     {
-        title: "Plan Your Tests",
-        body: "Click here to manually add tests or assignments. We'll build a study plan around them.",
-        targetId: 'add-task-btn',
-        position: 'bottom'
+        title: "Add Your First Class",
+        body: "Click '+ Add New Class' and add at least one subject. This helps the AI understand your assignments.",
+        targetId: 'add-class-btn',
+        position: 'bottom',
+        require: 'schedule'
+    },
+    {
+        title: "Map Your Routine",
+        body: "Now, click '+ Add Routine Block' for things like Soccer, Work, or Sleep. The AI will never schedule study during these times!",
+        targetId: 'add-routine-btn',
+        position: 'bottom',
+        require: 'activities'
     },
     {
         title: "AI Study Buddy",
         body: "Just ask! Type 'Plan my week' or 'I have a math test on Friday' to automate everything.",
         targetId: 'ai-chat-panel',
-        position: 'left'
+        position: 'left',
+        view: 'home'
     },
     {
-        title: "Visual Calendar",
-        body: "See your whole month at a glance. Every study session and class is automatically mapped.",
-        targetId: 'nav-calendar',
-        position: 'right'
+        title: "You're All Set!",
+        body: "Your journey to better grades starts now. Personalized, automated, and effortless.",
+        targetId: null,
+        position: 'center'
     }
 ];
 
-export default function Onboarding({ onFinish, isChatExpanded }) {
+export default function Onboarding({ onFinish, isChatExpanded, schedule = [], activities = [], setView }) {
     const [step, setStep] = useState(0);
     const [coords, setCoords] = useState({ top: '50%', left: '50%' });
     const cardRef = useRef(null);
 
     const updatePosition = () => {
         const currentData = tutorialSteps[step];
+
+        // Handle View Switching
+        if (currentData.view && setView) {
+            setView(currentData.view);
+        }
+
         if (!currentData.targetId) {
             setCoords({ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' });
             return;
@@ -91,11 +107,14 @@ export default function Onboarding({ onFinish, isChatExpanded }) {
             // Add highlight class
             document.querySelectorAll('.highlight-element').forEach(item => item.classList.remove('highlight-element'));
             el.classList.add('highlight-element');
+        } else {
+            // Fallback if element not found yet (e.g. view transition)
+            setCoords({ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' });
         }
     };
 
     useEffect(() => {
-        // Use a small timeout to let the layout shift complete if needed
+        // Use a small timeout to let the layout shift complete
         const timer = setTimeout(updatePosition, 100);
         window.addEventListener('resize', updatePosition);
         return () => {
@@ -103,7 +122,7 @@ export default function Onboarding({ onFinish, isChatExpanded }) {
             window.removeEventListener('resize', updatePosition);
             document.querySelectorAll('.highlight-element').forEach(item => item.classList.remove('highlight-element'));
         };
-    }, [step, isChatExpanded]);
+    }, [step, isChatExpanded, schedule.length, activities.length, setView]);
 
     const handleNext = () => {
         if (step < tutorialSteps.length - 1) {
@@ -120,6 +139,8 @@ export default function Onboarding({ onFinish, isChatExpanded }) {
     };
 
     const currentStep = tutorialSteps[step];
+    const isLocked = (currentStep.require === 'schedule' && schedule.length === 0) ||
+        (currentStep.require === 'activities' && activities.length === 0);
 
     return (
         <div className="tutorial-overlay">
@@ -129,11 +150,16 @@ export default function Onboarding({ onFinish, isChatExpanded }) {
                 style={coords}
             >
                 <div className="tutorial-header">
-                    <div className="tutorial-icon">✨</div>
+                    <div className="tutorial-icon">{isLocked ? '🔒' : '✨'}</div>
                     <div className="tutorial-title">{currentStep.title}</div>
                 </div>
                 <div className="tutorial-body">
                     {currentStep.body}
+                    {isLocked && (
+                        <div style={{ color: '#ffb300', fontSize: '0.8rem', marginTop: '12px', fontWeight: '600' }}>
+                            ⚠️ Please add at least one to continue.
+                        </div>
+                    )}
                 </div>
                 <div className="tutorial-footer">
                     <div className="tutorial-steps">
@@ -142,7 +168,12 @@ export default function Onboarding({ onFinish, isChatExpanded }) {
                     <div className="tutorial-btns">
                         {step > 0 && <button className="tut-skip-btn" onClick={handleBack}>Back</button>}
                         {step === 0 && <button className="tut-skip-btn" onClick={onFinish}>Skip</button>}
-                        <button className="tut-next-btn" onClick={handleNext}>
+                        <button
+                            className="tut-next-btn"
+                            onClick={handleNext}
+                            disabled={isLocked}
+                            style={{ opacity: isLocked ? 0.5 : 1, cursor: isLocked ? 'not-allowed' : 'pointer' }}
+                        >
                             {step === tutorialSteps.length - 1 ? "Finish" : "Next"}
                         </button>
                     </div>

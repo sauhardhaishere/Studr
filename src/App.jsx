@@ -289,7 +289,15 @@ function App() {
 
   return (
     <div className="layout-grid">
-      {showTutorial && <Onboarding onFinish={handleFinishTutorial} isChatExpanded={isChatExpanded} />}
+      {showTutorial && (
+        <Onboarding
+          onFinish={handleFinishTutorial}
+          isChatExpanded={isChatExpanded}
+          schedule={schedule}
+          activities={activities}
+          setView={setView}
+        />
+      )}
       <aside className="sidebar">
         <div className="logo-area"><LogoIcon /></div>
         <nav className="nav-menu">
