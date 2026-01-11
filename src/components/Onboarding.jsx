@@ -113,6 +113,12 @@ export default function Onboarding({ onFinish, isChatExpanded }) {
         }
     };
 
+    const handleBack = () => {
+        if (step > 0) {
+            setStep(step - 1);
+        }
+    };
+
     const currentStep = tutorialSteps[step];
 
     return (
@@ -134,7 +140,8 @@ export default function Onboarding({ onFinish, isChatExpanded }) {
                         {step + 1} of {tutorialSteps.length}
                     </div>
                     <div className="tutorial-btns">
-                        <button className="tut-skip-btn" onClick={onFinish}>Skip</button>
+                        {step > 0 && <button className="tut-skip-btn" onClick={handleBack}>Back</button>}
+                        {step === 0 && <button className="tut-skip-btn" onClick={onFinish}>Skip</button>}
                         <button className="tut-next-btn" onClick={handleNext}>
                             {step === tutorialSteps.length - 1 ? "Finish" : "Next"}
                         </button>
