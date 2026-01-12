@@ -104,22 +104,25 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       const uniqueSubjects = [...new Set(foundSubjects)];
       const primarySubject = uniqueSubjects[0];
 
-      const isAssignment = lastUserLower.includes("homework") || lastUserLower.includes("hw") || lastUserLower.includes("assignment");
-      const isTest = lastUserLower.includes("test") || lastUserLower.includes("exam") || lastUserLower.includes("quiz") || lower.includes("test");
+      const isAssignment = lastUserLower.includes("homework") || lastUserLower.includes("hw") || lastUserLower.includes("assignment") || lower.includes("homework") || lower.includes("hw");
+      const isTest = lastUserLower.includes("test") || lastUserLower.includes("exam") || lastUserLower.includes("quiz") || lower.includes("test") || lower.includes("exam") || lower.includes("quiz");
       const hasTaskMention = isTest || isAssignment;
+
+      // Strict flag: Did the user START a new request in this exact message?
+      const currentMsgIsTask = lastUserLower.includes("homework") || lastUserLower.includes("hw") || lastUserLower.includes("assignment") || lastUserLower.includes("test") || lastUserLower.includes("exam") || lastUserLower.includes("quiz");
 
       // --- AGENTIC MEMORY ---
       const isAnsweringClassName = lastAILower.includes('full name of that class') || lastAILower.includes("full name of your");
       const isNegotiatingTime = lastAILower.includes('conflict') || lastAILower.includes('what time works');
 
-      if (isAnsweringClassName && lastUserMsg.length > 1 && !hasTaskMention) {
+      if (isAnsweringClassName && lastUserMsg.length > 1 && !currentMsgIsTask) {
         const subjectFound = primarySubject || "General";
         const subCategory = subjectFound.charAt(0).toUpperCase() + subjectFound.slice(1);
         const newClass = { id: crypto.randomUUID(), name: lastUserMsg, subject: subCategory };
         return resolve({
           newTasks: [],
           newClasses: [newClass],
-          message: `Awesome! I've added ${lastUserMsg} to your schedule. Should I go ahead and schedule that study plan for this week?`
+          message: `Awesome! I've added **${lastUserMsg}** to your schedule. Should I go ahead and schedule that study plan for this week?`
         });
       }
 
