@@ -54,6 +54,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       let targetDeadline = new Date(today);
       let offset = 3;
       let dateParsed = false;
+      let isPastDate = false;
 
       const monthMatch = months.find(m => lastUserLower.includes(m));
       if (monthMatch) {
@@ -62,8 +63,12 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         if (dateMatch) {
           const dayNum = parseInt(dateMatch[1]);
           targetDeadline = new Date(today.getFullYear(), monthIdx, dayNum);
-          if (targetDeadline < today && (today.getMonth() !== monthIdx || today.getDate() !== dayNum)) {
-            targetDeadline.setFullYear(today.getFullYear() + 1);
+
+          // Only adjust year if the user didn't explicitly mean the past
+          if (targetDeadline < today && !lastUserLower.includes("last") && !lastUserLower.includes("yesterday")) {
+            if (today.getMonth() !== monthIdx || today.getDate() !== dayNum) {
+              targetDeadline.setFullYear(today.getFullYear() + 1);
+            }
           }
           dateParsed = true;
           offset = Math.round((targetDeadline - today) / (1000 * 60 * 60 * 24));
@@ -73,6 +78,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       if (!dateParsed) {
         if (lastUserLower.includes("tomorrow")) offset = 1;
         else if (lastUserLower.includes("today")) offset = 0;
+        else if (lastUserLower.includes("yesterday")) offset = -1;
         else {
           const foundDay = daysOfWeek
             .slice()
@@ -86,6 +92,16 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           }
         }
         targetDeadline.setDate(today.getDate() + offset);
+      }
+
+      // Check if the target is in the past
+      const todayStart = new Date(today);
+      todayStart.setHours(0, 0, 0, 0);
+      const targetStart = new Date(targetDeadline);
+      targetStart.setHours(0, 0, 0, 0);
+
+      if (targetStart < todayStart) {
+        isPastDate = true;
       }
 
       // --- SUBJECT DETECTION ---
@@ -107,10 +123,18 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       const isTest = lastUserLower.includes("test") || lastUserLower.includes("exam") || lastUserLower.includes("quiz");
       const hasTaskMention = isTest || isAssignment || lastUserLower.includes("review") || lastUserLower.includes("study");
 
+      // Handle Past Input: if user says "math test yesterday", we shouldn't schedule it or review sessions.
+      if (isPastDate && hasTaskMention) {
+        resolve({
+          newTasks: [], newClasses: [], newActivities: [],
+          message: `I notice you mentioned a task in the past (${formatDate(targetDeadline)}). I don't schedule tasks or study sessions retroactively. Was this a mistake, or would you like to record it as completed?`
+        });
+        return;
+      }
+
       // --- CONVERSATIONAL STATE HANDLING ---
-      // 1. Is the AI asking for a class name?
+      const lastAILower = lastAILine.toLowerCase();
       const isAnsweringClassQuestion = lastAILower.includes('full name of this class');
-      // 2. Is the AI asking for availability/routine?
       const isAnsweringAvailability = lastAILower.includes('fill out your daily routine') || lastAILower.includes('are you available at this time');
 
       // 1. Handle Class Name Response
@@ -134,7 +158,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         });
       }
 
-      // 2. Handle Availability/Time Response (e.g. "5-6 PM is fine")
+      // 2. Handle Availability/Time Response
       if (isAnsweringAvailability && lastUserLower.match(/(\d+)\s*(am|pm|pm|am)/i)) {
         const timeMatch = lastUserLower.match(/(\d+):?(\d+)?\s*(AM|PM)/i) || lastUserLower.match(/(\d+)\s*(pm|am)/i);
         if (timeMatch) {
@@ -142,31 +166,22 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           const ampm = (timeMatch[timeMatch.length - 1] || 'PM').toUpperCase();
           const timeStr = `${hour}:00 ${ampm}`;
 
-          // Find the last assignment/test requested
-          const originalRequestLine = lines.slice().reverse().find(l =>
-            l.startsWith('User:') && (l.toLowerCase().includes('homework') || l.toLowerCase().includes('test') || l.toLowerCase().includes('due'))
-          ) || "homework due tomorrow";
-
           const subject = uniqueSubjects[0] || "General";
           const subProper = subject.charAt(0).toUpperCase() + subject.slice(1);
           const dateStr = formatDate(targetDeadline);
 
-          newTasks = [
-            {
-              id: crypto.randomUUID(),
-              title: `${subProper} Task`,
-              time: `${dateStr}, ${timeStr}`,
-              duration: "1h",
-              priority: "medium",
-              type: "study",
-              description: `Manually scheduled slot for your ${subProper} work.`,
-            }
-          ];
+          newTasks = [{
+            id: crypto.randomUUID(),
+            title: `${subProper} Task`,
+            time: `${dateStr}, ${timeStr}`,
+            duration: "1h",
+            priority: "medium",
+            type: "study",
+            description: `Manually scheduled slot for your ${subProper} work.`,
+          }];
 
           return resolve({
-            newTasks,
-            newClasses: [],
-            newActivities: [],
+            newTasks, newClasses: [], newActivities: [],
             message: `Got it! I've pinned that **${subProper}** task for you at **${timeStr}** on **${dateStr}**. Let me know if you need to move anything else!`
           });
         }
@@ -196,8 +211,6 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         if (isAssignment) {
           const routineBlocks = activities || [];
           const currentTks = currentTasks || [];
-
-          // Only prompt for routine if they HAVEN'T provided a time in this message
           const timeInUserMsg = lastUserLower.match(/(\d+)\s*(pm|am)/i);
 
           if (routineBlocks.length < 1 && !timeInUserMsg) {
@@ -212,7 +225,6 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
             const ampm = (timeInUserMsg[2] || 'PM').toUpperCase();
             chosenSlot = { dateStr: deadlineStr, dayName: deadlineDay, time: `${h}:00 ${ampm}` };
           } else {
-            // Search routine...
             const freeSlots = routineBlocks.filter(b => b.isFreeSlot);
             if (freeSlots.length > 0) {
               const slot = freeSlots[0];
@@ -221,17 +233,15 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           }
 
           if (chosenSlot) {
-            newTasks = [
-              {
-                id: crypto.randomUUID(),
-                title: `${displayNames[0] || uniqueSubjects[0]} Task`,
-                time: `${chosenSlot.dateStr}, ${chosenSlot.time}`,
-                duration: "1h",
-                type: "study",
-                priority: "medium",
-                description: `Slot for ${displayNames[0] || uniqueSubjects[0]}.`
-              }
-            ];
+            newTasks = [{
+              id: crypto.randomUUID(),
+              title: `${displayNames[0] || uniqueSubjects[0]} Task`,
+              time: `${chosenSlot.dateStr}, ${chosenSlot.time}`,
+              duration: "1h",
+              type: "study",
+              priority: "medium",
+              description: `Slot for ${displayNames[0] || uniqueSubjects[0]}.`
+            }];
             message = `Done! I've scheduled your **${displayNames[0] || uniqueSubjects[0]}** for **${chosenSlot.time}** on **${chosenSlot.dateStr}**.`;
           } else {
             message = `I couldn't find a free slot. What time works best for you?`;
@@ -255,13 +265,22 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
             for (let i = 1; i <= 2; i++) {
               const d = new Date(targetDeadline);
               d.setDate(d.getDate() - i);
-              newTasks.push({
-                id: crypto.randomUUID(),
-                title: `${sub} Review`,
-                time: `${formatDate(d)}, 4:00 PM`,
-                type: "study",
-                priority: "medium"
-              });
+
+              const dStart = new Date(d);
+              dStart.setHours(0, 0, 0, 0);
+              const nowStart = new Date(today);
+              nowStart.setHours(0, 0, 0, 0);
+
+              // ONLY schedule sessions if day is Today or Future
+              if (dStart >= nowStart) {
+                newTasks.push({
+                  id: crypto.randomUUID(),
+                  title: `${sub} Review`,
+                  time: `${formatDate(d)}, 4:00 PM`,
+                  type: "study",
+                  priority: "medium"
+                });
+              }
             }
           });
         }
@@ -276,7 +295,8 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
             const ampm = (timeMatch[2] || "PM").toUpperCase();
             const updated = currentTasks.map(t => {
               if (t.type === 'study') {
-                return { ...t, time: `${t.time.split(',')[0]}, ${newH}:00 ${ampm}` };
+                const dateStr = t.time.includes(',') ? t.time.split(',')[0] : formatDate(today);
+                return { ...t, time: `${dateStr}, ${newH}:00 ${ampm}` };
               }
               return t;
             });
@@ -285,7 +305,6 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           }
         }
 
-        // --- GENERAL RESPONSIVENESS (WHAT'S YOUR NAME / HI) ---
         const greetings = ["hi", "hello", "hey", "sup", "yo", "good morning", "good afternoon", "good evening"];
         const feelings = ["how are you", "how's it going", "how are things", "what's up"];
         const nameQuery = ["name", "who are you", "what are you", "what is your name"];

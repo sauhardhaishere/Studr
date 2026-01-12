@@ -69,7 +69,11 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - If the routine is sparse (less than 5 blocks) or you schedule outside a free slot, ASK for confirmation in the 'message'.
        - If the user provides a direct time (e.g., "I'm free at 4pm"), PRIORITIZE that over any routine logic.
 
-    9. **FORMATTING RESPONSE (JSON ONLY):**
+    9. **NO PAST SCHEDULING (STRICT RULE):**
+       - You MUST NOT generate any tasks, study sessions, or activities for dates/times that have already passed relative to TODAY (e.g., if today is Monday, do not schedule for Sunday).
+       - If the user mentions a past event (e.g., "I had a math test yesterday"), acknowledge it politely but do not schedule anything.
+
+    10. **FORMATTING RESPONSE (JSON ONLY):**
        {
          "message": "Conversational explanation acknowledging the action or answering the user's question.",
          "newTasks": [],
@@ -83,7 +87,7 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
             ? `\n\nUser's Classes:\n${schedule.map(c => `- ${c.name} (${c.subject})`).join('\n')}`
             : "";
 
-        const userMessage = `Current Task Context: ${JSON.stringify({ tasks, activities, schedule })}${userClassesContext}\n\nUser Message: "${userInput}"`;
+        const userMessage = `TODAY'S TIMESTAMP: ${todayStr} ${today.toLocaleTimeString()}\n\nCALENDAR LOOKUP INDEX:\n${calendarTable}\n\nCurrent Task Context: ${JSON.stringify({ tasks, activities, schedule })}${userClassesContext}\n\nUser Message: "${userInput}"`;
 
         if (key && key.startsWith("gsk_")) {
             const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
