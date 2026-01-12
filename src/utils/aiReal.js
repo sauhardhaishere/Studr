@@ -31,9 +31,12 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - **CROSS-CHECK**: Verify the Month and Day match the index. Cross-check your math 3 times before outputting.
        - **STOP CONDITION**: If the subject is not in the 'User's Classes' list, you MUST stop and ask for the name in a friendly way.
 
-    2. **STUDY PROTOCOL & RESOURCES:**
-       - **TESTS**: Generate a multi-day plan (Test Task + 2-3 Study/Prep sessions leading up to it).
-       - **RESOURCES**: For EVERY Prep/Review, you MUST include: {"label": "Study Coach (AI)", "url": "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n"}.
+    2. **STUDY HELPER PROTOCOL (7-DAY PLAN):**
+       - **TESTS**: Generate a multi-day plan (Test Task + 2-3 Study/Prep sessions).
+       - **ACTIONABLE DESCRIPTIONS**: Every 'description' must be a specific STUDY COACH instruction.
+       - **PHASE 1 (Prep sessions)**: Focus on "Reorganizing and Note Preparation". Instructions should mention concept maps, condensed study guides, and identifying key themes.
+       - **PHASE 2 (Final Review)**: Focus on "Active Recall and Mock Testing". Instructions should mention timed practice tests, solving missed homework problems, and oral explanations of concepts.
+       - **RESOURCES**: Include: {"label": "Study Coach (AI)", "url": "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n"}.
 
     3. **ZERO OVERLAP POLICY (STRICT):**
        - **NEVER** schedule two tasks at the same time (e.g., two preps at 5:00 PM).
