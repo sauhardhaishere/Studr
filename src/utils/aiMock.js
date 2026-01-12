@@ -90,7 +90,61 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         return resolve({ newTasks: [], message: `I see you have a ${uniqueSubjects[0]} test! What's the full name of that class in your schedule?` });
       }
 
-      // --- STUDY HELPER COACHING LOGIC ---
+      // --- AVAILABILITY LOOKUP ---
+      const routineBlocks = activities || [];
+      const freeSlots = routineBlocks.filter(b => b.isFreeSlot);
+      const findFreeSlotForDay = (date) => {
+        const dName = getDayNameFromDate(date);
+        return freeSlots.find(s => s.appliedDays && s.appliedDays.includes(dName)) || freeSlots.find(s => s.frequency === 'daily');
+      };
+
+      // --- SMART SLOT GENERATOR ---
+      const usedSlotsByDay = {}; // { "Jan 14": [17, 18] }
+
+      const getOptimalTaskTime = (date, preferHourManual = null) => {
+        const dayKey = formatDate(date);
+        if (!usedSlotsByDay[dayKey]) usedSlotsByDay[dayKey] = [];
+
+        // 1. Check if user specified a time in the current message
+        if (preferHourManual !== null) {
+          let targetH = preferHourManual;
+          while (usedSlotsByDay[dayKey].includes(targetH)) targetH++;
+          usedSlotsByDay[dayKey].push(targetH);
+          const ampm = targetH >= 12 ? "PM" : "AM";
+          const displayH = targetH > 12 ? targetH - 12 : (targetH === 0 ? 12 : targetH);
+          return `${displayH}:00 ${ampm}`;
+        }
+
+        // 2. Check for a Free Slot in the user's routine
+        const freeSlot = findFreeSlotForDay(date);
+        if (freeSlot) {
+          const slotStartTimeStr = freeSlot.time.split(' - ')[0]; // e.g., "5:00 PM"
+          const match = slotStartTimeStr.match(/(\d+):?(\d+)?\s*(AM|PM)/i);
+          if (match) {
+            let h = parseInt(match[1]);
+            const ampm = match[3].toUpperCase();
+            if (ampm === 'PM' && h < 12) h += 12;
+            if (ampm === 'AM' && h === 12) h = 0;
+
+            // Check if this specific hour in the free slot is already taken by another New Task
+            let attemptH = h;
+            while (usedSlotsByDay[dayKey].includes(attemptH)) attemptH++;
+            usedSlotsByDay[dayKey].push(attemptH);
+
+            const finalAmpm = attemptH >= 12 ? "PM" : "AM";
+            const finalDisplayH = attemptH > 12 ? attemptH - 12 : (attemptH === 0 ? 12 : attemptH);
+            return `${finalDisplayH}:00 ${finalAmpm}`;
+          }
+        }
+
+        // 3. Fallback: Sequential scheduling from 4 PM onwards
+        let fallbackH = 16;
+        while (usedSlotsByDay[dayKey].includes(fallbackH)) fallbackH++;
+        usedSlotsByDay[dayKey].push(fallbackH);
+        return `${fallbackH > 12 ? fallbackH - 12 : fallbackH}:00 PM`;
+      };
+
+      // --- STUDY HELPER COACHING ---
       const getStudyAdvice = (sub, stage) => {
         const s = sub.toLowerCase();
         if (stage === 'final') {
@@ -98,7 +152,6 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           if (s.includes('bio') || s.includes('science')) return "• Work for 60 minutes. Self-quiz on all diagrams and processes. Explain the most complex cycle (e.g. Krebs) out loud without looking at notes.";
           return "• Work for 60 minutes. Conduct a mock exam. Use active recall to test yourself on every key concept without peekng at your study guide.";
         } else {
-          // Prep stage
           if (s.includes('math') || s.includes('calc')) return "• Work for 45 minutes. Re-organize your notes into a one-page formula sheet. Solve 10 'challenge' problems from the textbook chapters being tested.";
           if (s.includes('bio') || s.includes('science')) return "• Work for 45 minutes. Transform your notes into a concept map. Identify the relationships between key systems and define all vocabulary terms.";
           return "• Work for 45 minutes. Condense your class notes into a structured study guide. Identify the 5 most likely essay or short-answer topics and draft outlines for them.";
@@ -112,21 +165,12 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         return res;
       };
 
-      let startHour = userTimePref ? userTimePref.hour : 16;
-      const getSlot = () => {
-        const ampm = startHour >= 12 ? "PM" : "AM";
-        const h = startHour > 12 ? startHour - 12 : (startHour === 0 ? 12 : startHour);
-        const t = `${h}:00 ${ampm}`;
-        startHour++;
-        return t;
-      };
-
       if (hasTaskMention && uniqueSubjects.length > 0) {
         const subName = matchedClasses[0].name;
         const deadlineStr = formatDate(targetDeadline);
 
         if (isAssignment) {
-          const t = getSlot();
+          const t = getOptimalTaskTime(targetDeadline, userTimePref ? userTimePref.hour : null);
           newTasks = [{
             id: crypto.randomUUID(), title: `${subName} Work`, time: `${deadlineStr}, ${t}`,
             duration: "45m", type: "study", priority: "medium",
@@ -141,10 +185,10 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           for (let i = 1; i <= 2; i++) {
             const d = new Date(targetDeadline); d.setDate(d.getDate() - i);
             if (d >= today) {
-              const t = getSlot();
+              const t = getOptimalTaskTime(d, userTimePref ? userTimePref.hour : null);
               const stage = i === 1 ? 'final' : 'prep';
               newTasks.push({
-                id: crypto.randomUUID(), title: `${subName} ${i === 1 ? 'Final Review' : 'Prep Session'}`, time: `${formatDate(d)}, ${t}`,
+                id: crypto.randomUUID(), title: `${subName} ${i === 1 ? 'Review' : 'Prep'}`, time: `${formatDate(d)}, ${t}`,
                 duration: i === 1 ? "1h" : "45m", type: "study", priority: "medium",
                 description: getStudyAdvice(subName, stage), resources: getResources(true)
               });
