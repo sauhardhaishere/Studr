@@ -1,25 +1,21 @@
+import { simulateAIAnalysis } from "./aiMock";
 
-const API_KEY = import.meta.env.VITE_AI_API_KEY || "";
+/**
+ * Generates a structured schedule using AI (Groq, OpenAI, or Gemini).
+ * If the API call fails or no key is provided, it falls back to a smart mock analysis.
+ */
+export const generateScheduleFromAI = async (userInput, tasks, activities, schedule, key) => {
+    // Current Date Context for the AI
+    const today = new Date();
+    const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    const todayStr = today.toLocaleDateString('en-US', dateOptions);
 
-export const generateScheduleFromAI = async (userInput, tasks, activities, schedule, today = new Date()) => {
-    const key = API_KEY.trim();
-
-    if (!key || key.includes("YOUR_")) {
-        console.warn("No valid API Key set. Falling back to mock.");
-        return null; // Trigger Mock
-    }
-
-    const now = today || new Date();
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-    // HARDCODED CALENDAR TABLE
+    // Build a tiny "calendar table" for the next 14 days so AI doesn't hallucinate dates
     let calendarTable = "";
     for (let i = 0; i < 14; i++) {
         const d = new Date(today);
         d.setDate(today.getDate() + i);
-        const dayName = dayNames[d.getDay()];
-        const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        calendarTable += `[INDEX ${i}] -> ${dayName}, ${dateStr}${i === 0 ? " (TODAY - THE STARTING POINT)" : ""}\n`;
+        calendarTable += `${d.toLocaleDateString('en-US', { weekday: 'short' })}: ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${i === 0 ? " (TODAY)" : ""}\n`;
     }
 
     const systemPrompt = `
@@ -44,88 +40,38 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - **IF A MATCH EXISTS**:
          - Always use the formal \`name\` from the schedule in all task titles (e.g., use "AP Calculus" instead of "Math").
 
-    2. **DUPLICATE DETECTION:**
-       - Scan the **Current Task Context** for existing tests/exams.
-       - If the user mentions a test already on the schedule, ask if they want to override or if it's a mistake.
-    
-    3. **CONVERSATION & DATE ANCHORING:**
-       - **STEP 1:** Identify Today: Index 0 (${today.toDateString()}).
-       - **FUTURE ONLY:** You MUST NOT schedule any tasks in the past. If the current time is 6:00 PM, you cannot schedule a task for 4:30 PM on the same day.
-       - **STEP 2:** Map the target day to the **CALENDAR LOOKUP INDEX**.
-       - **STEP 3:** Define the **DEADLINE_INDEX**. 
-       - **STEP 4 (STRICT CUTOFF):** If the Test is in the morning (before 12 PM), the **DEADLINE_INDEX** day is a **DEAD ZONE**. PROHIBITED: No study tasks on that day.
-    
-    4. **STRICT RULES (ZERO TOLERANCE):**
-       - **CEILING:** All study tasks MUST have an index strictly LESS than the DEADLINE_INDEX if the test is in the morning.
-       - **CRAMMING PROTECTION:** Maximum ONE study session per day. 
-       - **SPREAD THE LOAD:** Do not skip days leading up to the test if the timeline is short (< 5 days). Use every available day (Index 0, 1, 2...).
-    5. **CALENDLY 7-DAY COUNTDOWN PROTOCOL (ADAPTIVE):**
-       Follow this cadence based on the remaining days:
-       - **7+ Days away:** Use the standard cadence (T-7 Setup, T-5 Study, T-3 Review, T-1 Final).
-       - **3-5 Days away:** Compress the schedule. Use every day. (e.g., Sun: Setup/Sec 1, Mon: Sec 2, Tue: Final Review).
-       - **Test Day:** THE TEST ONLY. No study sessions.
-       
-       *Calculation Rule:* T-X means (DEADLINE_INDEX - X). Only schedule for indexes >= 0.
-       **- IMPORTANT:** You MUST generate the actual Test itself as a task in the 'newTasks' array on the DEADLINE_INDEX. Set its 'type' to "task" to distinguish it from "study" sessions.
-    
-     6. **ZERO OVERLAP POLICY & REALISTIC DURATIONS:**
-        - **DURATIONS:** Every task MUST have a realistic 'duration' (e.g., "45m", "1h 30m", "2h"). Study sessions should typically be 45-90 minutes.
-        - **SPECIFICITY:** The 'description' for study sessions MUST specify EXACTLY what to do. DO NOT just say "Study". Use: "Review slides 1-20 & Active Recall", "Complete Practice Test B", "Flashcards on Vocab List 4".
-        - **STRICT PROHIBITION:** You MUST NOT schedule two things in the same hour. 
-        - **TIME OFFSET:** If two subjects share a day, they must be separated by at least 1.5 hours. 
-        - **ROUTINE VERIFICATION:** 
-          - Search the 'activities' context for blocks where 'isFreeSlot' is true. 
-          - ALWAYS prioritize scheduling 'study' sessions inside these 'isFreeSlot' blocks.
-          - IF THE USER'S ROUTINE IS SPARSE (less than 5 blocks total) OR IF YOU MUST SCHEDULE OUTSIDE A FREE SLOT:
-            - You MUST ask for confirmation in the 'message'. Example: "I've proposed a study session at 4:00 PM on Tuesday. Since your routine isn't fully filled out, are you usually available at this time?"
+    2. **STUDY SCHEDULE GENERATION:**
+       - Only generate tasks if specifically requested or if a deadline is mentioned.
+       - Use a professional, academic tone.
+       - Always include relevant, high-quality resources (Khan Academy, Quizlet, etc.).
+
+    3. **ZERO OVERLAP POLICY:**
+       - Ensure new tasks do not overlap with each other or existing 'activities'.
+
+    4. **DATES ARE MANDATORY:**
+       - Every task MUST have a date using the format "Month Day, Time" (e.g., "Jan 13, 4:00 PM").
+       - Use the CALENDAR LOOKUP INDEX to ensure dates are correct.
+
+    5. **AGENTIC RESPONSIVENESS (CONVERSATIONAL CONTEXT):**
+       - You are a PROACTIVE AGENT. If the user responds to a question you just asked (e.g., "5-6 PM" in response to you asking for their routine), you MUST associate that response with the last task discussed and schedule it.
+       - **CHITCHAT & IDENTITY:** Respond naturally to "who are you?", "what's your name?", etc. (You are Calendly). If they just say "hi" or "how are you", be friendly and encourage them to schedule something.
+       - **ID PRESERVATION:** If updating a task or class, ALWAYS use the existing ID from the 'Current Task Context'. This is the only way the app can update the record instead of creating duplicates.
+
+    6. **TASK MODIFICATION & UPDATES:**
+       - If the user says "actually move it to 5pm" or "reschedule", identify the most relevant task and update its time/date while KEEPING THE SAME ID.
+       - If they mention a NEW task ("homework due tomorrow") but don't specify a subject, use "General" as a fallback and schedule a study session.
+
+    7. **DYNAMIC SUBJECT HANDLING:**
+       - If the user says "Change my Math class name to AP Calculus", update the class and all associated tasks in the response.
      
-     7. **TESTS vs. ASSIGNMENTS (STRICT DISTINCTION):**
-       - **IF IT'S A TEST/EXAM:** Apply the full multi-day countdown (Rule 5).
-       - **IF IT'S AN ASSIGNMENT/HOMEWORK:** 
-          - **DUAL TASK REQUIREMENT:** You must generate TWO tasks for an assignment:
-            1. **THE WORK SESSION:** Find the **EARLIEST** future day with an 'isFreeSlot: true' block where no other task is scheduled. Title it "[Subject] Homework".
-            2. **THE DEADLINE:** Create a marker task on the actual DEADLINE date. Title it "[Subject] DUE". Set 'type' to "task".
-          - **SCHEDULE CHECK:** If routine activities are sparse (less than 5), ask the user to fill out 'My Schedule' first so you can find a "Free Seat".
-          - **CONVERSATION:** Tell the user both the work time and the deadline date.
+    8. **ROUTINE & AVAILABILITY:**
+       - Search the 'activities' context for 'isFreeSlot: true' blocks.
+       - If the routine is sparse (less than 5 blocks) or you schedule outside a free slot, ASK for confirmation in the 'message'.
+       - If the user provides a direct time (e.g., "I'm free at 4pm"), PRIORITIZE that over any routine logic.
 
-    8. **RESOURCE RECOMMENDATIONS (MANDATORY FOR ALL TASKS):**
-       - You MUST provide specific, high-quality links relevant to the subject for EVERY task in 'newTasks'.
-       - **MANDATORY FOR ALL 'study' TASKS:** You MUST include the link: {"label": "Study Coach (AI)", "url": "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n"} as the first resource.
-       - **Math/Science:** Khan Academy (specific topic), or Knowt.
-       - **AP Classes:** College Board, Knowt, or specific AP Prep YouTube channels.
-       - **History:** Heimler's History or Knowt.
-       - **General Fallback:** Always include Knowt (https://knowt.com) for flashcards and AI notes.
-       - **FORMAT:** `[{ "label": "Specific Resource Name", "url": "https://link.com" }]`
-       - **STRICT:** Every single task object in 'newTasks' MUST have a 'resources' array with 2-3 links.
-
-    9. **TASK FORMATTING (DATES ARE MANDATORY):**
-       - The 'time' field for all tasks MUST include the full date from the index (e.g., "Jan 13, 10:00 AM").
-       - Never return just the time. The user needs to see the date on every task card.
-       - **DATE ACCURACY:** Double check the **CALENDAR LOOKUP INDEX**. If the user says "next [Day]", it is usually Index ([DayIdx - TodayIdx] + 7). Verify before final JSON output.
-    
-     11. **TASK MODIFICATION & UPDATES (CRITICAL):**
-        - If the user asks to "move", "reschedule", "change", or "update" existing tasks (e.g., "move my math review to 5pm" or "actually the test is on Wednesday"):
-        - 1. Identify the existing task(s) in the **Current Task Context**.
-        - 2. Calculate the new dates/times based on the user's request.
-        - 3. You MUST return the updated task objects in the \`newTasks\` array. 
-        - 4. **IMPORTANT:** Keep the SAME \`id\` for these tasks so the app updates them instead of creating duplicates.
-        - 5. If the user refers to "them" (e.g., "move them all to 5pm"), update all recently generated study sessions for that specific subject.
-
-     12. **DYNAMIC SUBJECT HANDLING:**
-        - If the user says "Change my Math class to AP Calculus", you should:
-          - 1. Update the class in \`newClasses\` using the same ID if possible (or title name).
-          - 2. Update all associated tasks to reflect the new name.
-     
-     13. **ROUTINE VERIFICATION & CONVERSATIONAL MEMORY:**
-          - Search the 'activities' context for blocks where 'isFreeSlot' is true. 
-          - ALWAYS prioritize scheduling 'study' sessions inside these 'isFreeSlot' blocks.
-          - IF THE USER'S ROUTINE IS SPARSE (less than 5 blocks total) OR IF YOU MUST SCHEDULE OUTSIDE A FREE SLOT:
-            - You MUST ask for confirmation in the 'message'. Example: "I've proposed a study session at 4:00 PM on Tuesday. Since your routine isn't fully filled out, are you usually available at this time?"
-          - If the user responds with a preference (e.g., "I prefer 5pm"), REMEMBER THIS for future suggestions in the current session.
-
-     14. **FORMATTING RESPONSE (JSON ONLY):**
+    9. **FORMATTING RESPONSE (JSON ONLY):**
        {
-         "message": "Conversational explanation acknowledging the specific changes made.",
+         "message": "Conversational explanation acknowledging the action or answering the user's question.",
          "newTasks": [],
          "newClasses": [],
          "newActivities": []
@@ -139,7 +85,7 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
 
         const userMessage = `Current Task Context: ${JSON.stringify({ tasks, activities, schedule })}${userClassesContext}\n\nUser Message: "${userInput}"`;
 
-        if (key.startsWith("gsk_")) {
+        if (key && key.startsWith("gsk_")) {
             const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                 method: "POST",
                 headers: {
@@ -167,7 +113,7 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
             return JSON.parse(contentString);
         }
 
-        if (key.startsWith("sk-")) {
+        if (key && key.startsWith("sk-")) {
             const response = await fetch("https://api.openai.com/v1/chat/completions", {
                 method: "POST",
                 headers: {
@@ -192,7 +138,7 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
             return JSON.parse(contentString);
         }
 
-        else {
+        if (key && !key.startsWith("sk-") && !key.startsWith("gsk_")) {
             const models = [
                 { ver: 'v1beta', name: 'gemini-1.5-flash-latest' },
                 { ver: 'v1beta', name: 'gemini-1.5-flash' },
@@ -230,14 +176,11 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
             throw new Error(`Gemini All Models Failed: ${lastErr}`);
         }
 
+        // --- FALLBACK TO MOCK ---
+        throw new Error("No valid API key provided or API calls failed.");
+
     } catch (error) {
-        console.error("AI Connection Failed:", error);
-        if (key.startsWith("gsk_")) {
-            return {
-                message: `[Groq Error] ${error.message}. Check your key.`,
-                newTasks: []
-            };
-        }
-        return null; // Trigger Mock
+        console.warn("AI Connection Failed, using Mock:", error.message);
+        return await simulateAIAnalysis(userInput, tasks, activities, schedule, today);
     }
 };

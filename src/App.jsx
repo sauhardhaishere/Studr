@@ -211,21 +211,16 @@ function App() {
       setIsProcessing(true);
       const updatedHistory = [...chatHistory, { author: 'user', text: userMsg }];
       setChatHistory(updatedHistory);
-
-      const fullContext = updatedHistory.slice(-5)
-        .map(msg => `${msg.author === 'user' ? 'User' : 'Calendly'}: ${msg.text}`)
-        .join('\n');
-
+      const aiKey = localStorage.getItem('studr_ai_key') || '';
+      const fullContext = updatedHistory.slice(-6).map(m => `${m.author === 'user' ? 'User' : 'Calendly'}: ${m.text}`).join('\n');
       let result = null;
       try {
         const { generateScheduleFromAI } = await import('./utils/aiReal');
-        result = await generateScheduleFromAI(fullContext, tasks, activities, schedule, new Date());
-      } catch (aiErr) {
-        console.error("AI failed");
-      }
-
+        result = await generateScheduleFromAI(fullContext, tasks, activities, schedule, aiKey);
+      } catch (e) { console.error("AI Error:", e); }
       if (!result) {
-        result = await simulateAIAnalysis(fullContext, tasks, activities, schedule, new Date());
+        const { simulateAIAnalysis } = await import('./utils/aiMock');
+        result = await simulateAIAnalysis(fullContext, tasks, activities, schedule);
       }
 
       const incomingTasks = result.newTasks || result.generatedSchedule || [];
