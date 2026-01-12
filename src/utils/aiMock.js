@@ -89,7 +89,10 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       }
 
       // --- SUBJECT DETECTION ---
-      const subjectMap = ["math", "bio", "chem", "english", "history", "physics", "spanish", "calc", "precalc", "algebra", "geometry", "stats", "science", "ap"];
+      const subjectMap = [
+        "math", "bio", "chem", "english", "history", "physics", "spanish", "calc", "precalc", "algebra", "geometry", "stats", "science", "ap",
+        "literature", "gov", "econ", "compsci", "coding", "art", "music", "pe", "health", "psych", "soc", "french", "latin", "german", "chinese", "phys"
+      ];
       const foundSubjects = subjectMap.filter(s => lastUserLower.includes(s));
       const uniqueSubjects = [...new Set(foundSubjects)];
 
@@ -104,7 +107,12 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       const isTest = lastUserLower.includes("test") || lastUserLower.includes("exam") || lastUserLower.includes("quiz");
       const hasTaskMention = isTest || isAssignment || lastUserLower.includes("review") || lastUserLower.includes("study");
 
-      // --- CLASS VERIFICATION (STOP CONDITION) ---
+      if (hasTaskMention && uniqueSubjects.length === 0) {
+        // Fallback for general task mentions like "homework is due tomorrow"
+        uniqueSubjects.push("General");
+        displayNames[0] = "General Homework/Study";
+      }
+
       const missingSubjectIdx = displayNames.findIndex(name => name === null);
 
       // Check if user is PROVIDING a class name in response to a prompt
@@ -323,50 +331,78 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           }
         }
       } else {
-        // --- MODIFICATION / RESCHEDULE LOGIC ---
+        // --- MODIFICATION / RESCHEDULE LOGIC (Date & Time) ---
         const isMoveCommand = lastUserLower.includes("move") || lastUserLower.includes("reschedule") || lastUserLower.includes("change");
-        const isBulkMove = isMoveCommand && (lastUserLower.includes("them") || lastUserLower.includes("all"));
-        const timeMatch = lastUserLower.match(/(\d+)\s*(pm|am)/);
+        const currentTks = currentTasks || [];
 
-        if (isMoveCommand) {
-          const currentTks = currentTasks || [];
-          let modifiedTasks = [];
-          let targetSubject = uniqueSubjects[0] || "";
+        if (isMoveCommand && currentTks.length > 0) {
+          const targetSubject = (uniqueSubjects[0] || "").toLowerCase();
+          // Find tasks related to this subject
+          const subjectTasks = currentTks.filter(t => t.title.toLowerCase().includes(targetSubject));
 
-          if (isBulkMove) {
-            // Find the most recently added study sessions
-            const studySessions = currentTks.filter(t => t.type === 'study');
-            if (timeMatch && studySessions.length > 0) {
-              const newH = parseInt(timeMatch[1]);
-              const ampm = timeMatch[2].toUpperCase();
+          if (subjectTasks.length > 0) {
+            let modifiedTasks = [];
+            const timeMatch = lastUserLower.match(/(\d+)\s*(pm|am)/);
 
-              modifiedTasks = studySessions.map(t => {
-                const datePart = t.time.split(',')[0];
-                return { ...t, time: `${datePart}, ${newH}:00 ${ampm}` };
+            if (dateParsed) {
+              // Rescheduling a test date
+              const newDeadlineStr = formatDate(targetDeadline);
+              const newDeadlineDay = getDayNameFromDate(targetDeadline);
+
+              subjectTasks.forEach((t) => {
+                const isMainTest = t.type === 'task' && (t.title.toLowerCase().includes('test') || t.title.toLowerCase().includes('quiz') || t.title.toLowerCase().includes('due'));
+
+                if (isMainTest) {
+                  // Move main test to the new day
+                  const oldTime = t.time.includes(',') ? t.time.split(',')[1].trim() : "8:00 AM";
+                  modifiedTasks.push({ ...t, time: `${newDeadlineStr}, ${oldTime}` });
+                } else if (t.type === 'study') {
+                  // Shift study sessions relative to the new day
+                  const isFinalReview = t.title.toLowerCase().includes('final');
+                  const dayShift = isFinalReview ? 1 : 2;
+                  const studyDate = new Date(targetDeadline);
+                  studyDate.setDate(targetDeadline.getDate() - dayShift);
+
+                  const oldTime = t.time.includes(',') ? t.time.split(',')[1].trim() : "4:00 PM";
+                  modifiedTasks.push({ ...t, time: `${formatDate(studyDate)}, ${oldTime}` });
+                }
               });
 
               resolve({
                 newTasks: modifiedTasks,
                 newClasses: [],
                 newActivities: [],
-                message: `No problem! I've moved all your study sessions to **${newH}:00 ${ampm}**. Does this new timing work better for you?`
+                message: `I've rescheduled your **${uniqueSubjects[0] || targetSubject}** test and study plan to **${newDeadlineDay}, ${newDeadlineStr}**. All sessions have been shifted accordingly!`
               });
               return;
-            }
-          } else if (timeMatch) {
-            // Single task move... (look for subject)
-            const newH = parseInt(timeMatch[1]);
-            const ampm = timeMatch[2].toUpperCase();
-            const taskToMove = currentTks.find(t => t.title.toLowerCase().includes(targetSubject));
-            if (taskToMove) {
-              const datePart = taskToMove.time.split(',')[0];
-              const updated = { ...taskToMove, time: `${datePart}, ${newH}:00 ${ampm}` };
-              resolve({
-                newTasks: [updated],
-                newClasses: [],
-                newActivities: [],
-                message: `Sure thing! I've updated the **${taskToMove.title}** to **${newH}:00 ${ampm}**.`
-              });
+            } else if (timeMatch) {
+              // Rescheduling just the time
+              const newH = parseInt(timeMatch[1]);
+              const ampm = timeMatch[2].toUpperCase();
+              const isBulk = lastUserLower.includes("them") || lastUserLower.includes("all") || lastUserLower.includes("sessions");
+
+              if (isBulk) {
+                modifiedTasks = subjectTasks.map(t => {
+                  const datePart = t.time.split(',')[0];
+                  return { ...t, time: `${datePart}, ${newH}:00 ${ampm}` };
+                });
+                resolve({
+                  newTasks: modifiedTasks,
+                  newClasses: [],
+                  newActivities: [],
+                  message: `No problem! I've moved all your ${targetSubject} sessions to **${newH}:00 ${ampm}**.`
+                });
+              } else {
+                const t = subjectTasks[0];
+                const datePart = t.time.split(',')[0];
+                modifiedTasks = [{ ...t, time: `${datePart}, ${newH}:00 ${ampm}` }];
+                resolve({
+                  newTasks: modifiedTasks,
+                  newClasses: [],
+                  newActivities: [],
+                  message: `Sure thing! I've updated your **${t.title}** to **${newH}:00 ${ampm}**.`
+                });
+              }
               return;
             }
           }

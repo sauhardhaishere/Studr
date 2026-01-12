@@ -232,22 +232,59 @@ function App() {
       const incomingClasses = result.newClasses || [];
       const incomingActivities = result.newActivities || [];
 
+      // 1. Process Tasks
       if (incomingTasks.length > 0) {
-        const newTasksWithIds = incomingTasks.map((t, idx) => ({
-          ...t,
-          id: crypto.randomUUID(),
-          completed: false,
-          type: t.type || 'study'
-        }));
-        setTasks(prev => [...newTasksWithIds, ...prev]);
+        setTasks(prev => {
+          let nextTasks = [...prev];
+          incomingTasks.forEach(t => {
+            const idx = nextTasks.findIndex(et => et.id === t.id);
+            if (idx !== -1) {
+              // Update existing
+              nextTasks[idx] = { ...nextTasks[idx], ...t };
+            } else {
+              // Add new
+              nextTasks.unshift({
+                ...t,
+                id: t.id || crypto.randomUUID(),
+                completed: false,
+                type: t.type || 'study'
+              });
+            }
+          });
+          return nextTasks;
+        });
       }
+
+      // 2. Process Classes
       if (incomingClasses.length > 0) {
-        const newClassesWithIds = incomingClasses.map((c, idx) => ({ ...c, id: crypto.randomUUID(), type: 'class' }));
-        setSchedule(prev => [...prev, ...newClassesWithIds]);
+        setSchedule(prev => {
+          let nextClasses = [...prev];
+          incomingClasses.forEach(c => {
+            const idx = nextClasses.findIndex(ec => ec.id === c.id);
+            if (idx !== -1) {
+              nextClasses[idx] = { ...nextClasses[idx], ...c };
+            } else {
+              nextClasses.push({ ...c, id: c.id || crypto.randomUUID() });
+            }
+          });
+          return nextClasses;
+        });
       }
+
+      // 3. Process Activities
       if (incomingActivities.length > 0) {
-        const newActivitiesWithIds = incomingActivities.map((a, idx) => ({ ...a, id: crypto.randomUUID(), type: 'activity' }));
-        setActivities(prev => [...prev, ...newActivitiesWithIds]);
+        setActivities(prev => {
+          let nextActivities = [...prev];
+          incomingActivities.forEach(a => {
+            const idx = nextActivities.findIndex(ea => ea.id === a.id);
+            if (idx !== -1) {
+              nextActivities[idx] = { ...nextActivities[idx], ...a };
+            } else {
+              nextActivities.push({ ...a, id: a.id || crypto.randomUUID() });
+            }
+          });
+          return nextActivities;
+        });
       }
 
       setChatHistory(prev => [...prev, { author: 'ai', text: result.message }]);
