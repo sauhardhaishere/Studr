@@ -99,10 +99,15 @@ function App() {
   // 2. Save Tasks (Debounced/Immediate)
   // 2. Save Tasks
   useEffect(() => {
-    if (!session || tasks.length === 0) return;
+    if (!session) return;
     const saveTasks = async () => {
       try {
         const uId = session.user.id;
+
+        // If local tasks are empty, we don't upsert (upserting [] does nothing).
+        // Deletions are handled by handleDeleteTask, so we only upsert if there's data.
+        if (tasks.length === 0) return;
+
         const validTasks = tasks.map(t => ({
           id: t.id,
           user_id: uId,
@@ -128,10 +133,12 @@ function App() {
 
   // 3. Save Schedule (Classes)
   useEffect(() => {
-    if (!session || schedule.length === 0) return;
+    if (!session) return;
     const saveSchedule = async () => {
       try {
         const uId = session.user.id;
+        if (schedule.length === 0) return;
+
         const validClasses = schedule.map(c => ({
           id: c.id,
           user_id: uId,
@@ -151,10 +158,12 @@ function App() {
 
   // 4. Save Activities
   useEffect(() => {
-    if (!session || activities.length === 0) return;
+    if (!session) return;
     const saveActivities = async () => {
       try {
         const uId = session.user.id;
+        if (activities.length === 0) return;
+
         const validActivities = activities.map(a => ({
           id: a.id,
           user_id: uId,
