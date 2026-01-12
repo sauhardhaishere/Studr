@@ -41,9 +41,11 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
          - Always use the formal \`name\` from the schedule in all task titles (e.g., use "AP Calculus" instead of "Math").
 
     2. **STUDY SCHEDULE GENERATION:**
-       - Only generate tasks if specifically requested or if a deadline is mentioned.
+       - **TEST PROTOCOL**: If a user mentions a TEST, EXAM, or QUIZ, you MUST generate a multi-day study plan.
+       - 1. The Test Task itself on the deadline date.
+       - 2. At least 2-3 **Study Sessions** (Prep, Final Review) on the days leading up to the test.
+       - Always include relevant, high-quality resources (Khan Academy, Quizlet, etc.) for EVERY task.
        - Use a professional, academic tone.
-       - Always include relevant, high-quality resources (Khan Academy, Quizlet, etc.).
 
     3. **ZERO OVERLAP POLICY:**
        - Ensure new tasks do not overlap with each other or existing 'activities'.

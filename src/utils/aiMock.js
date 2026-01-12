@@ -18,6 +18,11 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
       // --- DYNAMIC DATE CALCULATOR ---
       const daysOfWeek = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+      const dayTypos = {
+        "thurs": "thursday", "thur": "thursday", "thrudsay": "thursday", "thrusday": "thursday",
+        "tues": "tuesday", "tuseday": "tuesday", "wednes": "wednesday", "weds": "wednesday",
+        "mon": "monday", "fri": "friday", "sat": "saturday", "sun": "sunday"
+      };
       const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
       const getDayOffset = (targetDayName, isNext) => {
@@ -77,9 +82,14 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         else if (lastUserLower.includes("today")) offset = 0;
         else if (lastUserLower.includes("yesterday")) offset = -1;
         else {
-          const foundDay = daysOfWeek.find(d => lastUserLower.includes(d));
+          let foundDay = daysOfWeek.find(d => lastUserLower.includes(d));
+          if (!foundDay) {
+            const typo = Object.keys(dayTypos).find(t => lastUserLower.includes(t));
+            if (typo) foundDay = dayTypos[typo];
+          }
+
           if (foundDay) offset = getDayOffset(foundDay, lastUserLower.includes("next"));
-          else offset = 1;
+          else offset = 3;
         }
         targetDeadline.setDate(today.getDate() + offset);
       }
@@ -97,101 +107,110 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       const isTest = lastUserLower.includes("test") || lastUserLower.includes("exam") || lastUserLower.includes("quiz");
       const hasTaskMention = isTest || isAssignment || lastUserLower.includes("review") || lastUserLower.includes("study");
 
-      // --- AVAILABILITY LOGIC ---
-      const routineBlocks = activities || [];
-      const freeSlots = routineBlocks.filter(b => b.isFreeSlot);
-
-      const findFreeSlotForDay = (targetDate) => {
-        const dayName = getDayNameFromDate(targetDate);
-        return freeSlots.find(s => s.appliedDays && s.appliedDays.includes(dayName)) || freeSlots.find(s => s.frequency === 'daily');
+      // --- RESOURCES ---
+      const getResources = (sub) => {
+        const s = sub.toLowerCase();
+        if (s.includes('math') || s.includes('calc')) return [{ label: "Khan Academy Math", url: "https://www.khanacademy.org/math" }];
+        if (s.includes('bio') || s.includes('science')) return [{ label: "BioDigital", url: "https://www.biodigital.com" }];
+        return [{ label: "Quizlet", url: "https://quizlet.com" }];
       };
 
-      // Conversational State
+      // --- AVAILABILITY LOOKUP ---
+      const routineBlocks = activities || [];
+      const freeSlots = routineBlocks.filter(b => b.isFreeSlot);
+      const findFreeSlot = (date) => {
+        const dName = getDayNameFromDate(date);
+        return freeSlots.find(s => s.appliedDays && s.appliedDays.includes(dName)) || freeSlots.find(s => s.frequency === 'daily');
+      };
+
+      // --- CONVERSATIONAL STATES ---
       const isAnsweringAvailability = lastAILower.includes('is that fine') || lastAILower.includes('what time is best') || lastAILower.includes('fill out your daily routine');
 
-      // 1. Handle "Yes" to proposed time
-      if (isAnsweringAvailability && (lastUserLower === 'yes' || lastUserLower.includes('yes that') || lastUserLower.includes('that works'))) {
-        // Look for the previously proposed time in AI message
-        const timeMatch = lastAILine.match(/(\d+):?(\d+)?\s*(AM|PM)/i);
-        const proposedTime = timeMatch ? timeMatch[0] : "4:00 PM";
-
+      // 1. Availability Handle (Yes/No with Time)
+      if (isAnsweringAvailability && (lastUserLower === 'yes' || lastUserLower.includes('yes that') || userTimePref)) {
+        const propTime = (lastAILine.match(/(\d+):?(\d+)?\s*(AM|PM)/i) || ["5:00 PM"])[0];
+        const finalTime = userTimePref ? userTimePref.start : propTime;
         const subject = uniqueSubjects[0] || "General";
         const subProper = subject.charAt(0).toUpperCase() + subject.slice(1);
-        const dateStr = formatDate(targetDeadline);
 
         newTasks = [{
           id: crypto.randomUUID(),
           title: `${subProper} Session`,
-          time: `${dateStr}, ${proposedTime}`,
+          time: `${formatDate(targetDeadline)}, ${finalTime}`,
           duration: "1h", type: "study", priority: "medium",
-          description: `• Work for 60 minutes. focus on practice and logic.`,
-          resources: [{ label: "Quizlet", url: "https://quizlet.com" }]
+          description: `• Work for 60 minutes. Focus on key terms and practice problems.`,
+          resources: getResources(subject)
         }];
 
-        return resolve({ newTasks, newClasses: [], newActivities: [], message: `Excellent! I've scheduled your **${subProper}** session for **${proposedTime}**. I'll remember you're free then!` });
+        if (userTimePref) {
+          newActivities = [{
+            id: crypto.randomUUID(),
+            title: "Free Slot",
+            time: userTimePref.full || `${userTimePref.start} - ${userTimePref.end}`,
+            frequency: "weekly",
+            appliedDays: [getDayNameFromDate(targetDeadline)],
+            isFreeSlot: true
+          }];
+        }
+
+        return resolve({ newTasks, newActivities, message: `Perfect! Scheduled for **${finalTime}**. ${userTimePref ? "I've also saved this to your routine!" : ""}` });
       }
 
-      // 2. Handle specific time preference ("No, 5-6 PM is better")
-      if (isAnsweringAvailability && userTimePref) {
-        const subject = uniqueSubjects[0] || "General";
-        const subProper = subject.charAt(0).toUpperCase() + subject.slice(1);
-        const dateStr = formatDate(targetDeadline);
-        const dayName = getDayNameFromDate(targetDeadline);
-
-        // Task for now
-        newTasks = [{
-          id: crypto.randomUUID(),
-          title: `${subProper} Session`,
-          time: `${dateStr}, ${userTimePref.start}`,
-          duration: "1h", type: "study", priority: "medium",
-          description: `• Work for 60 minutes on ${subProper}.`,
-          resources: [{ label: "Quizlet", url: "https://quizlet.com" }]
-        }];
-
-        // Routine block for FUTURE
-        newActivities = [{
-          id: crypto.randomUUID(),
-          title: "Study Slot",
-          time: userTimePref.full || `${userTimePref.start} - ${userTimePref.end}`,
-          frequency: "weekly",
-          appliedDays: [dayName],
-          isFreeSlot: true
-        }];
-
-        return resolve({
-          newTasks,
-          newActivities,
-          newClasses: [],
-          message: `Got it! I've scheduled your **${subProper}** for **${userTimePref.start}** and saved this as a new **Free Slot** in your routine for ${dayName}s. I'll use this time in the future!`
-        });
-      }
-
-      // --- MAIN SCHEDULING FLOW ---
+      // --- MAIN SCHEDULING ---
       if (hasTaskMention && uniqueSubjects.length > 0) {
         const deadlineStr = formatDate(targetDeadline);
         const dayName = getDayNameFromDate(targetDeadline);
-        const freeSlot = findFreeSlotForDay(targetDeadline);
+        const sub = displayNames[0] || uniqueSubjects[0];
 
-        if (freeSlot) {
-          const startTime = freeSlot.time.split(' - ')[0];
+        // NO REPEATS CHECK
+        const isRepeat = (currentTasks || []).some(t => t.title.toLowerCase().includes(sub.toLowerCase()) && (t.title.toLowerCase().includes('test') || t.title.toLowerCase().includes('exam')));
+        if (isRepeat && isTest && !lastUserLower.includes("move")) {
+          return resolve({ newTasks: [], message: `You already have a **${sub}** test scheduled. Want to move it?` });
+        }
+
+        if (isAssignment) {
+          const slot = findFreeSlot(targetDeadline);
+          const finalTime = userTimePref ? userTimePref.start : (slot ? slot.time.split(' - ')[0] : null);
+
+          if (!finalTime) {
+            return resolve({ newTasks: [], message: `I don't see any free slots for ${dayName}. Is **5:00 PM** fine for your **${sub}** work?` });
+          }
+
           newTasks = [{
-            id: crypto.randomUUID(),
-            title: `${displayNames[0] || uniqueSubjects[0]} Work`,
-            time: `${deadlineStr}, ${startTime}`,
-            duration: "1h", type: "study", priority: "medium",
-            description: `• Work for 60 minutes during your free slot.`,
-            resources: [{ label: "Knowt", url: "https://knowt.com" }]
+            id: crypto.randomUUID(), title: `${sub} Work`, time: `${deadlineStr}, ${finalTime}`,
+            duration: "45m", type: "study", priority: "medium",
+            description: `• Work for 45 minutes to finish your ${sub} homework.`, resources: getResources(sub)
           }];
-          return resolve({ newTasks, newClasses: [], newActivities: [], message: `I found a free slot in your routine! I've scheduled your **${displayNames[0] || uniqueSubjects[0]}** for **${startTime}** on **${deadlineStr}**.` });
-        } else {
-          // No free slot! Ask the user.
-          const proposedTime = "5:00 PM";
-          message = `I don't see any free slots in your routine for ${dayName}. I've proposed **${proposedTime}** for your ${displayNames[0] || uniqueSubjects[0]} work. **Is that fine?** If not, what time is best for you on these days?`;
-          return resolve({ newTasks: [], newClasses: [], newActivities: [], message });
+          return resolve({ newTasks, message: `Scheduled your **${sub}** homework for **${finalTime}** on **${deadlineStr}**.` });
+
+        } else if (isTest) {
+          // TEST PLAN (WITH REVIEWS)
+          newTasks.push({
+            id: crypto.randomUUID(), title: `${sub} Test`, time: `${deadlineStr}, 8:00 AM`,
+            type: "task", priority: "high", description: `• Main assessment for ${sub}.`, resources: getResources(sub)
+          });
+
+          // Reviews
+          for (let i = 1; i <= 2; i++) {
+            const d = new Date(targetDeadline); d.setDate(d.getDate() - i);
+            if (d >= today) {
+              const slot = findFreeSlot(d);
+              const rTime = slot ? slot.time.split(' - ')[0] : "4:00 PM";
+              newTasks.push({
+                id: crypto.randomUUID(),
+                title: `${sub} ${i === 1 ? 'Review' : 'Prep'}`,
+                time: `${formatDate(d)}, ${rTime}`,
+                duration: i === 1 ? "1h" : "45m", type: "study", priority: "medium",
+                description: `• ${i === 1 ? 'Final brush up' : 'Study'} for ${sub} for ${i === 1 ? '60' : '45'} minutes.`,
+                resources: getResources(sub)
+              });
+            }
+          }
+          return resolve({ newTasks, message: `Got it! Created a study plan for your **${sub}** test. I've scheduled reviews leading up to ${deadlineStr}.` });
         }
       }
 
-      resolve({ newTasks: [], newClasses: [], newActivities: [], message: "I'm here to help! Tell me about a test or assignment." });
+      resolve({ newTasks: [], message: "I'm ready! Tell me about a test or homework." });
     }, 800);
   });
 };
