@@ -20,7 +20,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       // --- DYNAMIC DATE CALCULATOR ---
       const daysOfWeek = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
       const dayTypos = {
-        "thurs": "thursday", "thur": "thursday", "thrudsay": "thursday", "thrusday": "thursday",
+        "thurs": "thursday", "thur": "thursday", "thrusday": "thursday", "thrudsay": "thursday",
         "tues": "tuesday", "tuseday": "tuesday", "wednes": "wednesday", "wenesday": "wednesday", "wed": "wednesday", "weds": "wednesday",
         "mon": "monday", "fri": "friday", "sat": "saturday", "sun": "sunday"
       };
@@ -39,7 +39,30 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       const formatDate = (dateObj) => dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       const getDayNameFromDate = (dateObj) => dateObj.toLocaleDateString('en-US', { weekday: 'long' });
 
-      // --- DATE PARSING LOGIC ---
+      // --- ADVANCED TIME PARSER (Handles Ranges & Durations) ---
+      const parseTimeString = (timeStr) => {
+        const match = timeStr.match(/(\d+):?(\d+)?\s*(AM|PM)?/i);
+        if (!match) return null;
+        let h = parseInt(match[1]);
+        const m = parseInt(match[2] || "00");
+        const ampm = match[3] ? match[3].toUpperCase() : (h < 9 ? 'PM' : 'AM'); // Smart default
+        if (ampm === 'PM' && h < 12) h += 12;
+        if (ampm === 'AM' && h === 12) h = 0;
+        return h + (m / 60);
+      };
+
+      const formatTimeFromDecimal = (decimal) => {
+        const h = Math.floor(decimal);
+        const m = Math.round((decimal - h) * 60);
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const displayH = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+        const displayM = m.toString().padStart(2, '0');
+        return `${displayH}:${displayM} ${ampm}`;
+      };
+
+      const userRawTime = parseTimeString(lastUserLower);
+
+      // --- DATE PARSING ---
       const parseDateFromText = (text) => {
         let target = new Date(today);
         let dateFound = false;
@@ -53,8 +76,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
             else if (text.includes("wen")) foundDay = "wednesday";
           }
           if (foundDay) {
-            const offset = getDayOffset(foundDay, text.includes("next"));
-            target.setDate(today.getDate() + offset);
+            target.setDate(today.getDate() + getDayOffset(foundDay, text.includes("next")));
             dateFound = true;
           }
         }
@@ -74,91 +96,129 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
       // --- AGENTIC MEMORY ---
       const isAnsweringClassName = lastAILower.includes('full name of that class') || lastAILower.includes("full name of your");
-      const isNegotiatingTime = lastAILower.includes('conflict') || lastAILower.includes('is that fine') || lastAILower.includes('what time works');
+      const isNegotiatingTime = lastAILower.includes('conflict') || lastAILower.includes('what time works');
 
       if (isAnsweringClassName && lastUserMsg.length > 1 && !hasTaskMention) {
         const subjectFound = subjectMap.find(s => lower.includes(s)) || "General";
         const subCategory = subjectFound.charAt(0).toUpperCase() + subjectFound.slice(1);
         const newClass = { id: crypto.randomUUID(), name: lastUserMsg, subject: subCategory };
-        newClasses = [newClass];
         return resolve({
           newTasks: [],
-          newClasses,
-          message: `Awesome! I've added **${lastUserMsg}** to your schedule. Should I go ahead and schedule that study plan for this week?`
+          newClasses: [newClass],
+          message: `Awesome! I've added ${lastUserMsg} to your schedule. Should I go ahead and schedule that study plan for this week?`
         });
       }
 
-      // --- SMART TIME SLOTTING WITH CONFLICT DETECTION ---
+      // --- SMART GAP FINING ENGINE ---
       const routineBlocks = activities || [];
       const freeSlots = routineBlocks.filter(b => b.isFreeSlot);
       const allExistingTasks = currentTasks || [];
 
-      const getSlotWithConflictCheck = (date) => {
+      const getOptimalTaskTime = (date, durationHours = 1, preferenceHour = null) => {
         const dStr = formatDate(date);
         const dName = getDayNameFromDate(date);
-        const slot = freeSlots.find(s => s.appliedDays?.includes(dName)) || freeSlots.find(s => s.frequency === 'daily');
+        const dayTasks = allExistingTasks.filter(t => t.time.includes(dStr)).map(t => {
+          const startTime = parseTimeString(t.time.split(',')[1]);
+          const duration = t.duration ? (t.duration.includes('h') ? parseInt(t.duration) : parseInt(t.duration) / 60) : 1;
+          return { start: startTime, end: startTime + duration };
+        });
 
-        let proposedH = 16; // 4 PM
-        if (slot) {
-          const m = slot.time.match(/(\d+)/);
-          if (m) proposedH = parseInt(m[1]) + (slot.time.includes('PM') && parseInt(m[1]) < 12 ? 12 : 0);
+        // Current AI plan tasks (to avoid overlapping same-day new preps)
+        newTasks.filter(t => t.time.includes(dStr)).forEach(t => {
+          const startTime = parseTimeString(t.time.split(',')[1]);
+          const duration = 1;
+          dayTasks.push({ start: startTime, end: startTime + duration });
+        });
+
+        const dayFreeRange = freeSlots.find(s => s.appliedDays?.includes(dName)) || freeSlots.find(s => s.frequency === 'daily');
+        let blockStart = 16, blockEnd = 20; // Default 4-8 PM
+        if (dayFreeRange) {
+          const parts = dayFreeRange.time.split(' - ');
+          blockStart = parseTimeString(parts[0]) || 16;
+          blockEnd = parseTimeString(parts[1]) || (blockStart + 4);
         }
 
-        // Check against existing tasks
-        const hasConflict = allExistingTasks.some(t => t.time.includes(dStr) && t.time.includes(`${proposedH > 12 ? proposedH - 12 : (proposedH === 0 ? 12 : proposedH)}:00`));
+        // If user specified a time (like 2:55), try it first
+        if (preferenceHour !== null) {
+          const isTaken = dayTasks.some(t => (preferenceHour >= t.start && preferenceHour < t.end) || (preferenceHour + durationHours > t.start && preferenceHour + durationHours <= t.end));
+          if (!isTaken) return formatTimeFromDecimal(preferenceHour);
+        }
 
-        return { hour: proposedH, hasConflict, displayTime: `${proposedH > 12 ? proposedH - 12 : (proposedH === 0 ? 12 : proposedH)}:00 ${proposedH >= 12 ? 'PM' : 'AM'}` };
+        // Search for a gap in the free block
+        for (let t = blockStart; t <= blockEnd - durationHours; t += 0.5) {
+          const isTaken = dayTasks.some(task => (t >= task.start && t < task.end) || (t + durationHours > task.start && t + durationHours <= task.end));
+          if (!isTaken) return formatTimeFromDecimal(t);
+        }
+
+        return null; // No spot found!
       };
 
-      // --- MAIN SCHEDULING LOGIC ---
-      const primarySubject = uniqueSubjects[0];
-      const classRes = schedule && schedule.find(c => c.name.toLowerCase().includes(primarySubject) || (c.subject && c.subject.toLowerCase().includes(primarySubject)));
+      // --- MAIN SCHEDULING ---
+      const classRes = schedule && schedule.find(c => subjectMap.some(s => lower.includes(s) && (c.name.toLowerCase().includes(s) || (c.subject && c.subject.toLowerCase().includes(s)))));
 
-      if (hasTaskMention && !classRes) {
-        return resolve({ newTasks: [], message: `I see you have a ${primarySubject} test! What's the full name of that class in your schedule?` });
+      if (hasTaskMention && !classRes && !isNegotiatingTime) {
+        return resolve({ newTasks: [], message: `I see you have a test coming up! What's the full name of that class in your schedule?` });
+      }
+
+      const subName = classRes ? classRes.name : uniqueSubjects[0] || "General";
+
+      // If user provided a time during negotiation
+      if (isNegotiatingTime && userRawTime !== null) {
+        // Find what they were scheduling - check history
+        const testMatch = lower.match(/(\w+)\s+test/);
+        const confirmedSub = testMatch ? testMatch[1] : subName;
+        const targetDate = parseDateFromText(lower) || targetDeadline;
+
+        // Force create the plan with the user's time
+        newTasks.push({
+          id: crypto.randomUUID(), title: `${confirmedSub} Test`, time: `${formatDate(targetDate)}, 8:00 AM`,
+          type: "task", priority: "high", description: `• Exam day.`
+        });
+
+        const reviewTime = formatTimeFromDecimal(userRawTime);
+        newTasks.push({
+          id: crypto.randomUUID(), title: `${confirmedSub} Review`, time: `${formatDate(new Date(targetDate.getTime() - 86400000))}, ${reviewTime}`,
+          duration: "1h", type: "study", priority: "medium",
+          description: `• Final active recall session.`,
+          resources: [{ label: "Study Coach (AI)", url: "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n" }]
+        });
+
+        return resolve({ newTasks, message: `Perfect! I've set your study session for ${reviewTime} and mapped out the rest of your plan. You're all set!` });
       }
 
       if (hasTaskMention && classRes) {
-        const subName = classRes.name;
         const deadlineStr = formatDate(targetDeadline);
-        let foundConflict = false;
-        let conflictDay = "";
+        let missingSpotDay = null;
 
         if (isTest) {
           newTasks.push({
             id: crypto.randomUUID(), title: `${subName} Test`, time: `${deadlineStr}, 8:00 AM`,
-            type: "task", priority: "high", description: `• Exam day for ${subName}.`, resources: [{ label: "Quizlet", url: "https://quizlet.com" }]
+            type: "task", priority: "high", description: `• Exam day for ${subName}.`
           });
 
           for (let i = 1; i <= 2; i++) {
             const d = new Date(targetDeadline); d.setDate(d.getDate() - i);
             if (d >= today) {
-              const slotInfo = getSlotWithConflictCheck(d);
-              if (slotInfo.hasConflict) {
-                foundConflict = true;
-                conflictDay = getDayNameFromDate(d);
-              }
+              const bestTime = getOptimalTaskTime(d, 1);
+              if (!bestTime) { missingSpotDay = getDayNameFromDate(d); break; }
               newTasks.push({
-                id: crypto.randomUUID(), title: `${subName} ${i === 1 ? 'Review' : 'Prep'}`, time: `${formatDate(d)}, ${slotInfo.displayTime}`,
+                id: crypto.randomUUID(), title: `${subName} ${i === 1 ? 'Review' : 'Prep'}`, time: `${formatDate(d)}, ${bestTime}`,
                 duration: "1h", type: "study", priority: "medium",
-                description: i === 1 ? `• Timed practice test for ${subName}.` : `• Concept mapping for ${subName}.`,
+                description: i === 1 ? `• Timed practice test for ${subName}.` : `• Concept mapping and note condensing.`,
                 resources: [{ label: "Study Coach (AI)", url: "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n" }]
               });
             }
           }
 
-          if (foundConflict) {
-            return resolve({
-              newTasks: [], // Stop until we confirm time
-              message: `I noticed a conflict on **${conflictDay}** — you already have something scheduled during your usual study time. What time works best for you to study for **${subName}** that day?\n\n*Pro-tip: Fill out your full class schedule and routine blocks to help me avoid these overlaps!*`
-            });
+          if (missingSpotDay) {
+            return resolve({ newTasks: [], message: `I noticed a conflict on ${missingSpotDay}—I couldn't find a free gap in your routine from 2:55 to 6:00 PM. What time works best for you to study for ${subName} that day?` });
           }
 
-          return resolve({ newTasks, message: `Perfect! I've mapped out a high-performance study plan for your **${subName}** test on ${deadlineStr}. You're going to crush it!` });
+          return resolve({ newTasks, message: `Got it! I've automatically found gaps in your free time and mapped out a specific study plan for your ${subName} test on ${deadlineStr}.` });
         }
       }
 
-      resolve({ newTasks: [], message: "Hey there! I'm Calendly. Ready to build a high-performance study plan?" });
+      resolve({ newTasks: [], message: "Hey! I'm Calendly. Ready to build a high-performance study plan?" });
     }, 800);
   });
 };
