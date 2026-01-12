@@ -133,7 +133,6 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       }
 
       // --- CONVERSATIONAL STATE HANDLING ---
-      const lastAILower = lastAILine.toLowerCase();
       const isAnsweringClassQuestion = lastAILower.includes('full name of this class');
       const isAnsweringAvailability = lastAILower.includes('fill out your daily routine') || lastAILower.includes('are you available at this time');
 
