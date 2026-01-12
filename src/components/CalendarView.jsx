@@ -1,5 +1,5 @@
 import React from 'react';
-import { categorizeTask } from '../utils/dateUtils';
+import { categorizeTask, getTaskDateValue } from '../utils/dateUtils';
 
 const CalendarView = ({ tasks }) => {
     const [currentDate, setCurrentDate] = React.useState(new Date());
