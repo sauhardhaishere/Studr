@@ -91,7 +91,14 @@ function App() {
 
       // Fetch Activities
       const { data: a } = await supabase.from('activities').select('*');
-      if (a) setActivities(a);
+      if (a) {
+        const mappedActivities = a.map(item => ({
+          ...item,
+          appliedDays: item.applied_days || [],
+          isFreeSlot: item.is_free_slot || false
+        }));
+        setActivities(mappedActivities);
+      }
     };
     fetchData();
   }, [session]);
