@@ -65,6 +65,8 @@ function App() {
   const [schedule, setSchedule] = useState([]);
   const [activities, setActivities] = useState([]);
   const [chatHistory, setChatHistory] = useState([]);
+  const [streak, setStreak] = useState(0);
+  const [lastCompletedAt, setLastCompletedAt] = useState(null);
 
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -98,6 +100,29 @@ function App() {
           isFreeSlot: item.is_free_slot || false
         }));
         setActivities(mappedActivities);
+      }
+
+      // Fetch Profile (Streak)
+      const { data: p } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+      if (p) {
+        setStreak(p.streak || 0);
+        setLastCompletedAt(p.last_completed_at);
+
+        // Check if streak should be reset (if last completed was more than 1 day ago)
+        if (p.last_completed_at) {
+          const lastDate = new Date(p.last_completed_at);
+          lastDate.setHours(0, 0, 0, 0);
+          const todayDate = new Date();
+          todayDate.setHours(0, 0, 0, 0);
+          const diffDays = Math.floor((todayDate - lastDate) / (1000 * 60 * 60 * 24));
+          if (diffDays > 1) {
+            setStreak(0);
+            await supabase.from('profiles').upsert({ id: session.user.id, streak: 0 });
+          }
+        }
+      } else {
+        // Init profile
+        await supabase.from('profiles').insert({ id: session.user.id, streak: 0 });
       }
     };
     fetchData();
@@ -305,9 +330,35 @@ function App() {
 
       if (error) {
         console.error("Error deleting task:", error);
-        // Optional: Revert local state or show toast
       } else {
         setLastSaved(new Date());
+
+        // --- STREAK LOGIC ---
+        const todayStr = new Date().toISOString().split('T')[0];
+        const lastStr = lastCompletedAt ? lastCompletedAt.split('T')[0] : null;
+
+        if (todayStr !== lastStr) {
+          // It's a new day! Update streak.
+          let newStreak = streak;
+          const todayDate = new Date();
+          todayDate.setHours(0, 0, 0, 0);
+          const lastDate = lastCompletedAt ? new Date(lastCompletedAt) : null;
+          if (lastDate) lastDate.setHours(0, 0, 0, 0);
+
+          if (!lastDate || (todayDate - lastDate) / (1000 * 60 * 60 * 24) === 1) {
+            newStreak += 1;
+          } else {
+            newStreak = 1;
+          }
+
+          setStreak(newStreak);
+          setLastCompletedAt(new Date().toISOString());
+          await supabase.from('profiles').upsert({
+            id: session.user.id,
+            streak: newStreak,
+            last_completed_at: new Date().toISOString()
+          });
+        }
       }
     }
   };
@@ -418,7 +469,7 @@ function App() {
                 </button>
               </div>
               <div className="stats-row">
-                <div className="stat-card"><span className="stat-val">🔥 5</span><span className="stat-label">Day Streak</span></div>
+                <div className="stat-card"><span className="stat-val">🔥 {streak}</span><span className="stat-label">Day Streak</span></div>
                 <div className="stat-card"><span className="stat-val">{tasks.length}</span><span className="stat-label">Tasks</span></div>
               </div>
               {groupedTasks.overdue.length > 0 && (
