@@ -586,10 +586,12 @@ function App() {
                           id: crypto.randomUUID(),
                           title: `${displaySubject || 'Test'} - ${label}`,
                           time: reviewDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', 4:00 PM',
-                          duration: '45m',
+                          duration: label === 'Final Review' ? '1h 30m' : '45m',
                           type: 'study',
                           priority: 'medium',
-                          description: 'Auto-generated study session',
+                          description: label === 'Final Review'
+                            ? `Full content review. Focus on practice problems and active recall for high-yield topics.`
+                            : `Initial prep session. Reviewing notes and mapping out key concepts for the test.`,
                           resources: [
                             { label: "Study Coach (AI)", url: "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n" },
                             { label: "Knowt", url: "https://knowt.com" }

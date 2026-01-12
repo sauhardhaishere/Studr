@@ -68,13 +68,13 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        *Calculation Rule:* T-X means (DEADLINE_INDEX - X). Only schedule for indexes >= 0.
        **- IMPORTANT:** You MUST generate the actual Test itself as a task in the 'newTasks' array on the DEADLINE_INDEX. Set its 'type' to "task" to distinguish it from "study" sessions.
     
-    6. **ZERO OVERLAP POLICY (ONE PER HOUR):**
-       - **STRICT PROHIBITION:** You MUST NOT schedule two things in the same hour. If you have a 4:00 PM session for one subject, you cannot have a 4:00 PM session for another.
-       - **NO MULTITASKING:** Only one study session or activity per time block.
-       - **TIME OFFSET:** If two subjects share a day, they must be separated by at least 1.5 hours (e.g., Math at 4:00 PM, History at 5:30 PM). 
-       - **GLOBAL CHECK:** Before finalizing JSON, verify that every 'time' value in 'newTasks' is unique across the entire schedule.
-
-    7. **TESTS vs. ASSIGNMENTS (STRICT DISTINCTION):**
+     6. **ZERO OVERLAP POLICY & REALISTIC DURATIONS:**
+        - **DURATIONS:** Every task MUST have a realistic 'duration' (e.g., "45m", "1h 30m", "2h"). Study sessions should typically be 45-90 minutes.
+        - **SPECIFICITY:** The 'description' for study sessions MUST specify EXACTLY what to do. DO NOT just say "Study". Use: "Review slides 1-20 & Active Recall", "Complete Practice Test B", "Flashcards on Vocab List 4".
+        - **STRICT PROHIBITION:** You MUST NOT schedule two things in the same hour. 
+        - **TIME OFFSET:** If two subjects share a day, they must be separated by at least 1.5 hours. 
+     
+     7. **TESTS vs. ASSIGNMENTS (STRICT DISTINCTION):**
        - **IF IT'S A TEST/EXAM:** Apply the full multi-day countdown (Rule 5).
        - **IF IT'S AN ASSIGNMENT/HOMEWORK:** 
           - **DUAL TASK REQUIREMENT:** You must generate TWO tasks for an assignment:

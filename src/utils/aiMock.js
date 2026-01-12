@@ -170,7 +170,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
                 duration: "45m",
                 priority: "medium",
                 type: "study",
-                description: `Work session for your assignment.`,
+                description: `Dedicated slot to complete and review your ${displayNames[0]} assignment. Focus on active recall and comprehension.`,
                 resources: [{ label: "Study Guide", url: "https://quizlet.com" }]
               },
               {
@@ -238,10 +238,12 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
                   id: crypto.randomUUID(),
                   title: `${name} - ${i === 1 ? 'Final Review' : 'Prep Session'}`,
                   time: `${studyDateStr}, ${timeStr}`,
-                  duration: "1h",
+                  duration: i === 1 ? "1h 30m" : "45m",
                   priority: i === 1 ? "high" : "medium",
                   type: "study",
-                  description: `Dedicated review for ${name}. I've given this its own day at ${timeStr} to avoid overlap!`,
+                  description: i === 1
+                    ? `Final high-intensity review for ${name}. Focus on practice exam and difficult concepts.`
+                    : `Active recall session for ${name}. Reviewing core notes and identifying weak spots.`,
                   resources: [
                     { label: "Study Coach (AI)", url: "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n" },
                     ...(name.toLowerCase().includes('math') || name.toLowerCase().includes('calc')
