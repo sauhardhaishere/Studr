@@ -149,8 +149,8 @@ function App() {
         const validClasses = schedule.map(c => ({
           id: c.id,
           user_id: uId,
-          name: c.name,
-          subject: c.subject
+          name: c.name || 'Unknown Class',
+          subject: c.subject || 'Other'
         }));
         const { error } = await supabase.from('classes').upsert(validClasses);
         if (error) console.error("Error saving classes:", error);
@@ -174,12 +174,12 @@ function App() {
         const validActivities = activities.map(a => ({
           id: a.id,
           user_id: uId,
-          name: a.name,
-          time: a.time,
-          frequency: a.frequency,
-          applied_days: a.appliedDays || [],
-          type: a.type,
-          is_free_slot: a.isFreeSlot
+          name: a.name || 'Untitled Activity',
+          time: a.time || '12:00 PM - 1:00 PM',
+          frequency: a.frequency || 'weekly',
+          applied_days: Array.isArray(a.appliedDays) ? a.appliedDays : [],
+          type: a.type || 'activity',
+          is_free_slot: !!a.isFreeSlot
         }));
         const { error } = await supabase.from('activities').upsert(validActivities);
         if (error) console.error("Error saving activities:", error);

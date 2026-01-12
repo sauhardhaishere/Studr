@@ -61,19 +61,28 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities, onDele
     };
 
     const handleEdit = (block) => {
-        const [fullStart, fullEnd] = block.time.split(' - ');
-        const [startVal, startAmPm] = fullStart.split(' ');
-        const [endVal, endAmPm] = fullEnd.split(' ');
+        // Robust time parsing (handles "8:00 AM - 9:00 AM" or "8:00AM-9:00AM")
+        const timePart = block.time || "";
+        const [fullStart = "", fullEnd = ""] = timePart.split(/\s*-\s*/);
+
+        const parseSubTime = (str) => {
+            const match = str.match(/^(\d{1,2}:\d{2})\s*(AM|PM)$/i);
+            if (match) return [match[1], match[2].toUpperCase()];
+            return [str.replace(/(AM|PM)/i, '').trim(), str.toUpperCase().includes('PM') ? 'PM' : 'AM'];
+        };
+
+        const [startVal, startAmPm] = parseSubTime(fullStart);
+        const [endVal, endAmPm] = parseSubTime(fullEnd);
 
         setNewBlock({
-            name: block.name,
+            name: block.name || "",
             startTime: startVal,
             startAmPm: startAmPm || 'AM',
             endTime: endVal,
             endAmPm: endAmPm || 'PM',
-            days: block.appliedDays || [selectedDay],
+            days: block.appliedDays || [],
             type: block.type || 'activity',
-            isFreeSlot: block.isFreeSlot || false
+            isFreeSlot: !!block.isFreeSlot
         });
         setEditingBlockId(block.id);
         setIsAddingBlock(true);
