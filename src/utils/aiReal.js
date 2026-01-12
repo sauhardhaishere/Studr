@@ -84,13 +84,14 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
           - **CONVERSATION:** Tell the user both the work time and the deadline date.
 
     8. **RESOURCE RECOMMENDATIONS (MANDATORY FOR ALL TASKS):**
-       - You MUST provide specific, high-quality links relevant to the subject for EVERY task in 'newTasks' (including both 'study' sessions and 'task' deadlines).
-       - **Math/Science:** Khan Academy (specific topic), Quizlet, or Mathway.
-       - **AP Classes:** College Board, specific AP Prep YouTube channels.
-       - **English:** SparkNotes or LitCharts.
-       - **Fallback:** If no specific link exists, provide a link to Google Search for the topic or a well-known quiz site.
+       - You MUST provide specific, high-quality links relevant to the subject for EVERY task in 'newTasks'.
+       - **MANDATORY FOR ALL 'study' TASKS:** You MUST include the link: {"label": "Study Coach (AI)", "url": "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n"} as the first resource.
+       - **Math/Science:** Khan Academy (specific topic), or Knowt.
+       - **AP Classes:** College Board, Knowt, or specific AP Prep YouTube channels.
+       - **History:** Heimler's History or Knowt.
+       - **General Fallback:** Always include Knowt (https://knowt.com) for flashcards and AI notes.
        - **FORMAT:** `[{ "label": "Specific Resource Name", "url": "https://link.com" }]`
-       - **STRICT:** Every single task object in 'newTasks' MUST have a 'resources' array with at least 1-2 links.
+       - **STRICT:** Every single task object in 'newTasks' MUST have a 'resources' array with 2-3 links.
 
     9. **TASK FORMATTING (DATES ARE MANDATORY):**
        - The 'time' field for all tasks MUST include the full date from the index (e.g., "Jan 13, 10:00 AM").

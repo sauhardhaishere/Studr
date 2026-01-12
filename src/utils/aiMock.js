@@ -242,13 +242,16 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
                   priority: i === 1 ? "high" : "medium",
                   type: "study",
                   description: `Dedicated review for ${name}. I've given this its own day at ${timeStr} to avoid overlap!`,
-                  resources: name.toLowerCase().includes('math') || name.toLowerCase().includes('calc')
-                    ? [{ label: "Khan Academy Math", url: "https://www.khanacademy.org/math" }]
-                    : name.toLowerCase().includes('bio') || name.toLowerCase().includes('chem') || name.toLowerCase().includes('science')
-                      ? [{ label: "Khan Academy Science", url: "https://www.khanacademy.org/science" }]
-                      : name.toLowerCase().includes('history')
-                        ? [{ label: "Heimler's History", url: "https://www.youtube.com/@HeimlersHistory" }]
-                        : [{ label: "Knowt", url: "https://knowt.com" }]
+                  resources: [
+                    { label: "Study Coach (AI)", url: "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n" },
+                    ...(name.toLowerCase().includes('math') || name.toLowerCase().includes('calc')
+                      ? [{ label: "Khan Academy Math", url: "https://www.khanacademy.org/math" }]
+                      : name.toLowerCase().includes('bio') || name.toLowerCase().includes('chem') || name.toLowerCase().includes('science')
+                        ? [{ label: "Khan Academy Science", url: "https://www.khanacademy.org/science" }]
+                        : name.toLowerCase().includes('history')
+                          ? [{ label: "Heimler's History", url: "https://www.youtube.com/@HeimlersHistory" }]
+                          : [{ label: "Knowt", url: "https://knowt.com" }])
+                  ]
                 });
               }
             }

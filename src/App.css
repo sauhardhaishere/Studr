@@ -424,38 +424,50 @@
 .resource-label {
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #555;
-  font-weight: 700;
-  margin-bottom: 4px;
+  letter-spacing: 1.5px;
+  color: #777;
+  font-weight: 800;
+  margin-bottom: 8px;
 }
 
 .resource-list-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
 }
 
 .resource-link {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 6px 14px;
-  border-radius: 4px;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 16px;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: #aaa;
+  color: #eee;
   text-decoration: none;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .resource-link:hover {
-  background: white;
-  color: black;
-  border-color: white;
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.resource-link .res-icon {
+  font-size: 14px;
+}
+
+/* Highlight for the Study Coach link */
+.resource-link[href*="playlab.ai"] {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #fff;
 }
 
 .res-icon {

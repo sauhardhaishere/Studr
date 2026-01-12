@@ -398,7 +398,7 @@ function App() {
                         <div className="alert-title">Task Overdue</div>
                         <div className="alert-text">"{t.title}" was due {t.time}.</div>
                       </div>
-                      <button className="done-btn" onClick={() => setTasks(prev => prev.filter(tk => tk.id !== t.id))}>Done</button>
+                      <button className="done-btn" onClick={() => handleDeleteTask(t.id)}>Done</button>
                     </div>
                   ))}
                 </div>
@@ -570,7 +570,10 @@ function App() {
                     duration: '1h',
                     type: manualTask.type, // Use selected type
                     priority: 'high',
-                    description: 'Manual Entry'
+                    description: 'Manual Entry',
+                    resources: [
+                      { label: "Knowt", url: "https://knowt.com" }
+                    ]
                   });
 
                   // 2. Generate Review Days (Simple 2-day fallback logic)
@@ -586,7 +589,11 @@ function App() {
                           duration: '45m',
                           type: 'study',
                           priority: 'medium',
-                          description: 'Auto-generated study session'
+                          description: 'Auto-generated study session',
+                          resources: [
+                            { label: "Study Coach (AI)", url: "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n" },
+                            { label: "Knowt", url: "https://knowt.com" }
+                          ]
                         });
                       }
                     });
