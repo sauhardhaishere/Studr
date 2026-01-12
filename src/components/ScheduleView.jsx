@@ -143,29 +143,85 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities }) => {
                     const blocks = getBlocksForDay(day);
                     const isToday = day === new Date().toLocaleString('en-us', { weekday: 'long' });
 
-                    // NEW: Calculate Total Hours Filtered
-                    const totalMinutes = blocks.reduce((acc, b) => {
-                        const timeParts = b.time.split(' - ');
-                        if (timeParts.length < 2) return acc;
-                        const parse = (s) => {
-                            const match = s.match(/(\d+):(\d+)\s*(am|pm)/i);
-                            if (!match) return 0;
-                            let h = parseInt(match[1]);
-                            const m = parseInt(match[2]);
-                            const isPm = match[3].toLowerCase() === 'pm';
-                            if (isPm && h < 12) h += 12;
-                            if (!isPm && h === 12) h = 0;
-                            return h * 60 + m;
-                        };
-                        const start = parse(timeParts[0]);
-                        const end = parse(timeParts[1]);
-                        // Handle overnight blocks if needed, but for now simple diff
-                        return acc + (end > start ? end - start : (1440 - start) + end);
-                    }, 0);
+                    const parse = (s) => {
+                        if (!s || typeof s !== 'string') return 0;
+                        const match = s.match(/(\d+):(\d+)\s*(am|pm)/i);
+                        if (!match) return 0;
+                        let h = parseInt(match[1]);
+                        const m = parseInt(match[2]);
+                        const isPm = match[3].toLowerCase() === 'pm';
+                        if (isPm && h < 12) h += 12;
+                        if (!isPm && h === 12) h = 0;
+                        return h * 60 + m;
+                    };
 
-                    const totalHours = (totalMinutes / 60).toFixed(1);
-                    const missingHours = (24 - totalHours).toFixed(1);
-                    const coveragePercent = Math.min(100, (totalMinutes / 1440) * 100);
+                    const formatTime = (totalMin) => {
+                        let h = Math.floor(totalMin / 60);
+                        const m = totalMin % 60;
+                        const ampm = h >= 12 ? 'PM' : 'AM';
+                        h = h % 12 || 12;
+                        return `${h}:${m.toString().padStart(2, '0')} ${ampm}`;
+                    };
+
+                    // 1. Create Segments (Splitting overnight blocks)
+                    let segments = [];
+                    blocks.forEach(block => {
+                        const [startStr, endStr] = (block.time || "").split(' - ');
+                        if (!startStr || !endStr) return;
+                        const startMin = parse(startStr);
+                        const endMin = parse(endStr);
+
+                        if (endMin < startMin) {
+                            segments.push({ ...block, startMin: 0, endMin: endMin, displayTime: `12:00 AM - ${formatTime(endMin)}`, isWrap: true });
+                            segments.push({ ...block, startMin: startMin, endMin: 1440, displayTime: `${formatTime(startMin)} - 11:59 PM`, isWrap: true });
+                        } else {
+                            segments.push({ ...block, startMin: startMin, endMin: endMin, displayTime: block.time });
+                        }
+                    });
+
+                    // 2. Sort segments
+                    segments.sort((a, b) => a.startMin - b.startMin);
+
+                    // 3. Merge overlaps and find true coverage
+                    const timelineItems = [];
+                    let lastEnd = 0;
+                    let coveredMinutes = 0;
+
+                    segments.forEach((seg, idx) => {
+                        if (seg.startMin > lastEnd) {
+                            timelineItems.push({
+                                type: 'gap',
+                                time: `${formatTime(lastEnd)} - ${formatTime(seg.startMin)}`,
+                                startMin: lastEnd,
+                                endMin: seg.startMin,
+                                id: `gap-${lastEnd}-${idx}`
+                            });
+                        }
+
+                        // Overlap handling for display: if it starts before lastEnd, it's visibly overlapping
+                        timelineItems.push(seg);
+
+                        // For stats: only add non-overlapping minutes
+                        const actualStart = Math.max(lastEnd, seg.startMin);
+                        if (seg.endMin > actualStart) {
+                            coveredMinutes += (seg.endMin - actualStart);
+                            lastEnd = seg.endMin;
+                        }
+                    });
+
+                    if (lastEnd < 1440) {
+                        timelineItems.push({
+                            type: 'gap',
+                            time: `${formatTime(lastEnd)} - 11:59 PM`,
+                            startMin: lastEnd,
+                            endMin: 1440,
+                            id: `gap-end`
+                        });
+                    }
+
+                    const totalHours = (coveredMinutes / 60).toFixed(1);
+                    const missingMinutes = 1440 - coveredMinutes;
+                    const coveragePercent = (coveredMinutes / 1440) * 100;
 
                     return (
                         <div key={day} className={`day-column ${isToday ? 'is-today' : ''}`}>
@@ -176,80 +232,19 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities }) => {
                                 </div>
                                 <div className="coverage-info">
                                     <span className="hours-stat">{totalHours}h / 24h</span>
-                                    <span className="missing-stat">{missingHours > 0 ? `${missingHours}h missing` : 'Fully Mapped!'}</span>
+                                    <span className="missing-stat">
+                                        {missingMinutes > 1 ? `${(missingMinutes / 60).toFixed(1)}h missing` : 'Fully Mapped!'}
+                                    </span>
                                 </div>
                                 <div className="coverage-bar">
                                     <div className="coverage-fill" style={{ width: `${coveragePercent}%` }}></div>
                                 </div>
                             </div>
                             <div className="day-timeline">
-                                {(() => {
-                                    if (blocks.length === 0) return <div className="unmapped-gap full">24h Unmapped (00:00 - 24:00)</div>;
-
-                                    const parse = (s) => {
-                                        if (!s || typeof s !== 'string') return 0;
-                                        const match = s.match(/(\d+):(\d+)\s*(am|pm)/i);
-                                        if (!match) return 0;
-                                        let h = parseInt(match[1]);
-                                        const m = parseInt(match[2]);
-                                        const isPm = match[3].toLowerCase() === 'pm';
-                                        if (isPm && h < 12) h += 12;
-                                        if (!isPm && h === 12) h = 0;
-                                        return h * 60 + m;
-                                    };
-
-                                    const formatTime = (totalMin) => {
-                                        let h = Math.floor(totalMin / 60);
-                                        const m = totalMin % 60;
-                                        const ampm = h >= 12 ? 'PM' : 'AM';
-                                        h = h % 12 || 12;
-                                        return `${h}:${m.toString().padStart(2, '0')} ${ampm}`;
-                                    };
-
-                                    // 1. Create Segments (Splitting overnight blocks)
-                                    let segments = [];
-                                    blocks.forEach(block => {
-                                        const [startStr, endStr] = block.time.split(' - ');
-                                        const startMin = parse(startStr);
-                                        const endMin = parse(endStr);
-
-                                        if (endMin < startMin) {
-                                            // Overnight Wrap
-                                            segments.push({ ...block, startMin: 0, endMin: endMin, displayTime: `12:00 AM - ${formatTime(endMin)}`, isWrap: true });
-                                            segments.push({ ...block, startMin: startMin, endMin: 1440, displayTime: `${formatTime(startMin)} - 11:59 PM`, isWrap: true });
-                                        } else {
-                                            segments.push({ ...block, startMin: startMin, endMin: endMin, displayTime: block.time });
-                                        }
-                                    });
-
-                                    // 2. Sort all segments
-                                    segments.sort((a, b) => a.startMin - b.startMin);
-
-                                    // 3. Find Gaps
-                                    const timelineItems = [];
-                                    let lastEnd = 0;
-
-                                    segments.forEach((seg, idx) => {
-                                        if (seg.startMin > lastEnd) {
-                                            timelineItems.push({
-                                                type: 'gap',
-                                                time: `${formatTime(lastEnd)} - ${formatTime(seg.startMin)}`,
-                                                id: `gap-${lastEnd}-${idx}`
-                                            });
-                                        }
-                                        timelineItems.push(seg);
-                                        lastEnd = Math.max(lastEnd, seg.endMin);
-                                    });
-
-                                    if (lastEnd < 1440) {
-                                        timelineItems.push({
-                                            type: 'gap',
-                                            time: `${formatTime(lastEnd)} - 11:59 PM`,
-                                            id: `gap-end`
-                                        });
-                                    }
-
-                                    return timelineItems.map((item, idx) => (
+                                {timelineItems.length === 0 ? (
+                                    <div className="unmapped-gap full">24h Unmapped (0:00 - 24:00)</div>
+                                ) : (
+                                    timelineItems.map((item, idx) => (
                                         item.type === 'gap' ? (
                                             <div
                                                 key={item.id || idx}
@@ -301,8 +296,8 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities }) => {
                                                 }}>✕</button>
                                             </div>
                                         )
-                                    ));
-                                })()}
+                                    ))
+                                )}
                             </div>
                         </div>
                     );

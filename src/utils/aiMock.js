@@ -171,7 +171,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
                 priority: "medium",
                 type: "study",
                 description: `Work session for your assignment.`,
-                resources: []
+                resources: [{ label: "Study Guide", url: "https://quizlet.com" }]
               },
               {
                 id: Date.now() + 1,
@@ -181,7 +181,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
                 priority: "high",
                 type: "task",
                 description: `Official deadline for ${displayNames[0]}.`,
-                resources: []
+                resources: [{ label: "Submission Portal", url: "https://canvas.instructure.com" }]
               }
             ];
             message = `I've set up two markers for your ${subjectListStr} assignment: a work session for ${chosenSlot.dayName} (${chosenSlot.dateStr}) and the final deadline on ${deadlineDay} (${deadlineStr})!`;
@@ -203,7 +203,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
               priority: "high",
               type: "task",
               description: "Official assessment date.",
-              resources: []
+              resources: [{ label: "Final Exam Prep", url: "https://www.khanacademy.org" }]
             });
 
             // The Prep Sessions (Before Test Day)

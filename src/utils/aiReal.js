@@ -83,13 +83,14 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
           - **SCHEDULE CHECK:** If routine activities are sparse (less than 5), ask the user to fill out 'My Schedule' first so you can find a "Free Seat".
           - **CONVERSATION:** Tell the user both the work time and the deadline date.
 
-    8. **RESOURCE RECOMMENDATIONS (SUBJECT-SPECIFIC):**
-       - You MUST provide specific, high-quality links relevant to the subject.
+    8. **RESOURCE RECOMMENDATIONS (MANDATORY FOR ALL TASKS):**
+       - You MUST provide specific, high-quality links relevant to the subject for EVERY task in 'newTasks' (including both 'study' sessions and 'task' deadlines).
        - **Math/Science:** Khan Academy (specific topic), Quizlet, or Mathway.
-       - **AP Classes:** College Board, specific AP Prep YouTube channels (e.g., Heimler's for History, but ONLY for History).
+       - **AP Classes:** College Board, specific AP Prep YouTube channels.
        - **English:** SparkNotes or LitCharts.
-       - **FORMAT:** \`[{ "label": "Specific Resource Name", "url": "https://direct-link-to-subject.com" }]\`
-       - **STRICT:** Do not recommend history resources for math, or vice-versa.
+       - **Fallback:** If no specific link exists, provide a link to Google Search for the topic or a well-known quiz site.
+       - **FORMAT:** `[{ "label": "Specific Resource Name", "url": "https://link.com" }]`
+       - **STRICT:** Every single task object in 'newTasks' MUST have a 'resources' array with at least 1-2 links.
 
     9. **TASK FORMATTING (DATES ARE MANDATORY):**
        - The 'time' field for all tasks MUST include the full date from the index (e.g., "Jan 13, 10:00 AM").

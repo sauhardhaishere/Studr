@@ -375,11 +375,14 @@ function App() {
                               {task.description && <p className="task-description">{task.description}</p>}
                               {task.resources && task.resources.length > 0 && (
                                 <div className="task-resources">
-                                  {task.resources.map((res, i) => (
-                                    <a key={i} href={res.url} target="_blank" rel="noopener noreferrer" className="resource-link">
-                                      <span className="res-icon">🔗</span> {res.label}
-                                    </a>
-                                  ))}
+                                  <span className="resource-label">Study Resources:</span>
+                                  <div className="resource-list-row">
+                                    {task.resources.map((res, i) => (
+                                      <a key={i} href={res.url} target="_blank" rel="noopener noreferrer" className="resource-link">
+                                        <span className="res-icon">🔗</span> {res.label}
+                                      </a>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                             </div>
