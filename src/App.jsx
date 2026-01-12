@@ -253,6 +253,30 @@ function App() {
     }
   };
 
+  const handleDeleteTask = async (id) => {
+    setTasks(prev => prev.filter(t => t.id !== id));
+    if (session) {
+      const { error } = await supabase.from('tasks').delete().eq('id', id);
+      if (error) console.error("Error deleting task:", error);
+    }
+  };
+
+  const handleDeleteClass = async (id) => {
+    setSchedule(prev => prev.filter(c => c.id !== id));
+    if (session) {
+      const { error } = await supabase.from('classes').delete().eq('id', id);
+      if (error) console.error("Error deleting class:", error);
+    }
+  };
+
+  const handleDeleteActivity = async (id) => {
+    setActivities(prev => prev.filter(a => a.id !== id));
+    if (session) {
+      const { error } = await supabase.from('activities').delete().eq('id', id);
+      if (error) console.error("Error deleting activity:", error);
+    }
+  };
+
   const handleSaveEdit = (e) => {
     e.preventDefault();
     setTasks(prev => prev.map(t => t.id === editingTask.id ? editingTask : t));
@@ -388,7 +412,7 @@ function App() {
                             </div>
                             <div className="task-actions">
                               <button className="edit-task-btn" onClick={() => setEditingTask({ ...task })}>Edit</button>
-                              <button className="done-btn" onClick={() => setTasks(prev => prev.filter(t => t.id !== task.id))}>Done</button>
+                              <button className="done-btn" onClick={() => handleDeleteTask(task.id)}>Done</button>
                             </div>
                           </div>
                         ))}
@@ -401,7 +425,16 @@ function App() {
           )}
 
           {view === 'calendar' && <CalendarView tasks={tasks} />}
-          {view === 'schedule' && <ScheduleView schedule={schedule} setSchedule={setSchedule} activities={activities} setActivities={setActivities} />}
+          {view === 'schedule' && (
+            <ScheduleView
+              schedule={schedule}
+              setSchedule={setSchedule}
+              activities={activities}
+              setActivities={setActivities}
+              onDeleteClass={handleDeleteClass}
+              onDeleteActivity={handleDeleteActivity}
+            />
+          )}
         </div>
 
         {

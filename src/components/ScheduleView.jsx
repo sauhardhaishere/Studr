@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const ScheduleView = ({ schedule, setSchedule, activities, setActivities }) => {
+const ScheduleView = ({ schedule, setSchedule, activities, setActivities, onDeleteClass, onDeleteActivity }) => {
     const [selectedDay, setSelectedDay] = useState(new Date().toLocaleString('en-us', { weekday: 'long' }));
     const [isAddingBlock, setIsAddingBlock] = useState(false);
     const [isAddingClass, setIsAddingClass] = useState(false); // NEW: for class modal
@@ -80,7 +80,7 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities }) => {
     };
 
     const handleDelete = (id) => {
-        setActivities(activities.filter(a => a.id !== id));
+        onDeleteActivity(id);
     };
 
     const getBlocksForDay = (dayName) => {
@@ -131,7 +131,7 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities }) => {
                                 <span className="class-tag-name">{cls.name}</span>
                                 <span className="class-tag-subject">{cls.subject}</span>
                             </div>
-                            <button className="class-tag-del" onClick={() => setSchedule(schedule.filter(c => c.id !== cls.id))}>✕</button>
+                            <button className="class-tag-del" onClick={() => onDeleteClass(cls.id)}>✕</button>
                         </div>
                     ))
                 )}
