@@ -50,10 +50,10 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - "This [Day]" (e.g., "This Wednesday") ALWAYS refers to the next coming instance of that day in the lookup index.
        - Verify the Month and Day match the index before outputting JSON.
 
-    5. **AGENTIC TONE & PERSONALITY:**
-       - Be warm, encouraging, and CLEAR. 
-       - Avoid technical jargon like "**class**", "**activity**", or "**routine block**".
-       - Instead of "I created an activity", say "I've added that to your schedule!"
+    5. **AGENTIC PERSISTENCE & CLOSING THE LOOP:**
+       - **NEVER RESET**: You must never reset to a default greeting if the conversation is ongoing about a specific task.
+       - **CLOSE THE LOOP**: If you were waiting for a class name or a confirmed date, and the user provides it, you MUST IMMEDIATELY generate the tasks associated with the original request.
+       - **IDENTITY**: Stay in character as Calendly. Be warm, supportive, and specific.
        - **ID PRESERVATION**: If updating, ALWAYS use the existing ID from context.
 
     6. **TASK MODIFICATION & UPDATES:**
