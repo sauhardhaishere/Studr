@@ -26,10 +26,12 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
     CALENDAR LOOKUP INDEX:
     ${calendarTable}
     
-    1. **CLASS VERIFICATION & DATE PRECISION:**
-       - **FUZZY DAYS**: Be extremely resilient to typos (e.g., "wenesday" -> Wednesday, "thr" -> Thursday). Match them to the closest logical day in the index.
-       - **CROSS-CHECK**: Verify the Month and Day match the index. Cross-check your math 3 times before outputting.
-       - **STOP CONDITION**: If the subject is not in the 'User's Classes' list, you MUST stop and ask for the name in a friendly way.
+    1. **CLASS VERIFICATION & AGENTIC CREATION:**
+       - **VERIFICATION**: If a subject is mentioned but not in 'User's Classes', you MUST stop and ask: "I see you have a Spanish test! What's the full name of that class in your schedule?"
+       - **HANDLING REPLIES**: If the user provides a name (e.g., "Spanish 3") in response to your question:
+         - 1. Create the class in \`newClasses\`.
+         - 2. IMMEDIATELY proceed to schedule the originally requested tasks using this new class.
+       - **DATE PRECISION**: cross-check your math 3 times. "This Wednesday" must match the index perfectly.
 
     2. **STUDY HELPER PROTOCOL (7-DAY PLAN):**
        - **TESTS**: Generate a multi-day plan (Test Task + 2-3 Study/Prep sessions).
