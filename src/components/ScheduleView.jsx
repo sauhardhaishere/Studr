@@ -105,10 +105,10 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities, onDele
         // Sort by time
         return dayActivities.sort((a, b) => {
             const getVal = (s) => {
-                const match = s.match(/(\d+):(\d+)\s*(am|pm)/i);
+                const match = s.match(/(\d+)(?::(\d+))?\s*(am|pm)/i);
                 if (!match) return 0;
                 let h = parseInt(match[1]);
-                const m = parseInt(match[2]);
+                const m = match[2] ? parseInt(match[2]) : 0;
                 const isPm = match[3].toLowerCase() === 'pm';
                 if (isPm && h < 12) h += 12;
                 if (!isPm && h === 12) h = 0;
@@ -154,10 +154,10 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities, onDele
 
                     const parse = (s) => {
                         if (!s || typeof s !== 'string') return 0;
-                        const match = s.match(/(\d+):(\d+)\s*(am|pm)/i);
+                        const match = s.match(/(\d+)(?::(\d+))?\s*(am|pm)/i);
                         if (!match) return 0;
                         let h = parseInt(match[1]);
-                        const m = parseInt(match[2]);
+                        const m = match[2] ? parseInt(match[2]) : 0;
                         const isPm = match[3].toLowerCase() === 'pm';
                         if (isPm && h < 12) h += 12;
                         if (!isPm && h === 12) h = 0;
