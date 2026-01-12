@@ -73,6 +73,11 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
         - **SPECIFICITY:** The 'description' for study sessions MUST specify EXACTLY what to do. DO NOT just say "Study". Use: "Review slides 1-20 & Active Recall", "Complete Practice Test B", "Flashcards on Vocab List 4".
         - **STRICT PROHIBITION:** You MUST NOT schedule two things in the same hour. 
         - **TIME OFFSET:** If two subjects share a day, they must be separated by at least 1.5 hours. 
+        - **ROUTINE VERIFICATION:** 
+          - Search the 'activities' context for blocks where 'isFreeSlot' is true. 
+          - ALWAYS prioritize scheduling 'study' sessions inside these 'isFreeSlot' blocks.
+          - IF THE USER'S ROUTINE IS SPARSE (less than 5 blocks total) OR IF YOU MUST SCHEDULE OUTSIDE A FREE SLOT:
+            - You MUST ask for confirmation in the 'message'. Example: "I've proposed a study session at 4:00 PM on Tuesday. Since your routine isn't fully filled out, are you usually available at this time?"
      
      7. **TESTS vs. ASSIGNMENTS (STRICT DISTINCTION):**
        - **IF IT'S A TEST/EXAM:** Apply the full multi-day countdown (Rule 5).
@@ -96,6 +101,7 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
     9. **TASK FORMATTING (DATES ARE MANDATORY):**
        - The 'time' field for all tasks MUST include the full date from the index (e.g., "Jan 13, 10:00 AM").
        - Never return just the time. The user needs to see the date on every task card.
+       - **DATE ACCURACY:** Double check the **CALENDAR LOOKUP INDEX**. If the user says "next [Day]", it is usually Index ([DayIdx - TodayIdx] + 7). Verify before final JSON output.
     
     10. **CONVERSATIONAL FLEXIBILITY:**
        - While your primary job is scheduling, you MUST also respond naturally to greetings ("hi", "how are you?") and general questions.

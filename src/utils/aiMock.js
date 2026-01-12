@@ -72,9 +72,17 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         if (lastUserLower.includes("tomorrow")) offset = 1;
         else if (lastUserLower.includes("today")) offset = 0;
         else {
-          const foundDay = daysOfWeek.find(d => lastUserLower.includes(d));
+          // Sort by length descending to catch 'wednesday' before 'day' if 'day' was in the list
+          const foundDay = daysOfWeek
+            .slice()
+            .sort((a, b) => b.length - a.length)
+            .find(d => lastUserLower.includes(d));
+
           if (foundDay) {
             offset = getDayOffset(foundDay, lastUserLower.includes("next"));
+          } else {
+            // Default offset if no day found but user mentioned a task
+            offset = 3;
           }
         }
         targetDeadline.setDate(today.getDate() + offset);
@@ -226,6 +234,10 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
         } else {
           // --- TEST LOGIC (IMPROVED INTERLEAVING) ---
+          const routineBlocks = activities || [];
+          const isRoutineSparse = routineBlocks.length < 5;
+          let outOfRoutineSchedules = false;
+
           message = `Got it! You have ${displayNames.length > 1 ? "multiple tests" : "a " + displayNames[0] + " test"} coming up on ${deadlineDay} (${deadlineStr}). I've perfectly interleaved your study sessions to ensure you have a dedicated day for each subject!`;
 
           displayNames.forEach((name, subjectIdx) => {
@@ -269,6 +281,16 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
                 const m = totalMinutes % 60;
                 const timeStr = `${h}:${m === 0 ? "00" : m} PM`;
 
+                // Availability check for the session
+                const hasFreeSlot = routineBlocks.some(b =>
+                  b.isFreeSlot &&
+                  (b.frequency === 'daily' || (b.appliedDays && b.appliedDays.includes(getDayNameFromDate(studyDate)))) &&
+                  parseTimeToMinutes(b.time.split(' - ')[0]) <= totalMinutes &&
+                  parseTimeToMinutes(b.time.split(' - ')[1]) >= totalMinutes + 45
+                );
+
+                if (!hasFreeSlot) outOfRoutineSchedules = true;
+
                 newTasks.push({
                   id: crypto.randomUUID(),
                   title: `${name} - ${i === 1 ? 'Final Review' : 'Prep Session'}`,
@@ -293,6 +315,12 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
               }
             }
           });
+
+          if (isRoutineSparse) {
+            message += " Since your routine isn't fully filled out yet, I've picked some standard times for you. Are you available during these times, or should we move them?";
+          } else if (outOfRoutineSchedules) {
+            message += " I noticed some of these sessions fall outside your typical free slots. Will you be available then, or would you like to adjust your routine?";
+          }
         }
       } else {
         // --- CHAT / GREETING LOGIC ---
