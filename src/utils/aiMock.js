@@ -124,6 +124,15 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         return null;
       };
 
+      const getResources = (isReview = false) => {
+        const res = [{ label: "Study Coach (AI)", url: "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n" }];
+        if (isReview) {
+          res.push({ label: "Knowt", url: "https://knowt.com" });
+          res.push({ label: "Quizlet", url: "https://quizlet.com" });
+        }
+        return res;
+      };
+
       const getStudyAdvice = (sub, stage) => {
         const s = sub.toLowerCase();
         if (stage === 'final') {
@@ -132,6 +141,24 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           return "• Work for 60 minutes. Conduct a mock exam. Use active recall on every key concept.";
         }
         return "• Work for 45 minutes. Re-organize your notes and identify the 5 most likely exam topics.";
+      };
+
+      // AUTO CORRECT HELPER
+      const correctTypos = (text) => {
+        const corrections = {
+          "calclus": "Calculus", "calc": "Calculus", "calculs": "Calculus",
+          "chemestry": "Chemistry", "biolgy": "Biology", "histroy": "History",
+          "engish": "English", "spnsih": "Spanish", "spanih": "Spanish",
+          "pysics": "Physics", "algbra": "Algebra", "goemetry": "Geometry",
+          "precalc": "Precalculus", "trig": "Trigonometry", "calcus": "Calculus",
+          "comp sci": "Computer Science", "cs": "Computer Science"
+        };
+        let corrected = text;
+        Object.keys(corrections).forEach(typo => {
+          const regex = new RegExp(`\\b${typo}\\b`, 'gi');
+          corrected = corrected.replace(regex, corrections[typo]);
+        });
+        return corrected;
       };
 
       // --- SUBJECT DETECTION ---
@@ -147,28 +174,29 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       const isNegotiatingTime = lastAILower.includes('conflict') || lastAILower.includes('what time works');
 
       if (isAnsweringClassName && lastUserMsg.length > 1 && !currentMsgIsTask) {
+        // Auto Correct The Name
+        const correctedName = correctTypos(lastUserMsg);
+
         // 1. Find Original Request to get DATE and SUBJECT
-        // Look back 2 steps (AI question, then Original User Request)
         const originalRequest = lines[lines.length - 3] || "";
         const originalLower = originalRequest.toLowerCase();
-        const originalDate = parseDateFromText(originalLower) || new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000); // Default 3 days out
+        const originalDate = parseDateFromText(originalLower) || new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
 
         const originalSubject = subjectMap.find(s => originalLower.includes(s)) || "General";
         const subCategory = originalSubject.charAt(0).toUpperCase() + originalSubject.slice(1);
 
-        // 2. Create the Class using current message (Name) and original subject
-        const newClass = { id: crypto.randomUUID(), name: lastUserMsg, subject: subCategory };
+        // 2. Create the Class using CORRECTED name
+        const newClass = { id: crypto.randomUUID(), name: correctedName, subject: subCategory };
         newClasses.push(newClass);
 
-        // 3. IMMEDIATELY Schedule the Tasks (Resolve the loop)
-        const subName = lastUserMsg; // Use the specific name
+        // 3. IMMEDIATELY Schedule the Tasks
+        const subName = correctedName;
         const deadlineStr = formatDate(originalDate);
 
-        // Determine type of original request
         const origIsTest = originalLower.includes('test') || originalLower.includes('exam');
         const origIsHW = originalLower.includes('homework') || originalLower.includes('hw');
 
-        if (origIsTest || !origIsHW) { // Default to test logic if unsure
+        if (origIsTest || !origIsHW) {
           newTasks.push({
             id: crypto.randomUUID(), title: `${subName} Test`, time: `${deadlineStr}, 8:00 AM`,
             type: "task", priority: "high", description: `• Exam day for ${subName}.`
@@ -182,7 +210,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
                   id: crypto.randomUUID(), title: `${subName} ${i === 1 ? 'Review' : 'Prep'}`, time: `${formatDate(d)}, ${bestTime}`,
                   duration: "1h", type: "study", priority: "medium",
                   description: getStudyAdvice(subName, i === 1 ? 'final' : 'prep'),
-                  resources: [{ label: "Study Coach (AI)", url: "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n" }]
+                  resources: getResources(true)
                 });
               }
             }
@@ -194,7 +222,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
               id: crypto.randomUUID(), title: `${subName} Work`, time: `${deadlineStr}, ${bestTime}`,
               duration: "45m", type: "study", priority: "medium",
               description: `• Complete assignment for ${subName}.`,
-              resources: [{ label: "Study Coach (AI)", url: "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n" }]
+              resources: getResources(false)
             });
           }
         }
@@ -207,7 +235,6 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       }
 
       // --- MAIN SCHEDULING (Standard Flow) ---
-      // 1. Subject Detection
       let foundSubjects = subjectMap.filter(s => lastUserLower.includes(s));
       if (foundSubjects.length === 0) {
         for (let i = lines.length - 1; i >= 0; i--) {
@@ -217,13 +244,12 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         }
       }
       const uniqueSubjects = [...new Set(foundSubjects)];
-      const primarySubject = uniqueSubjects[0]; // e.g. "Math"
+      const primarySubject = uniqueSubjects[0];
 
       const targetDeadline = parseDateFromText(lastUserLower) || new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
       const userRawTime = parseTimeString(lastUserLower);
 
-      // 2. Class Lookup
-      // Check if we can find a class matching this subject
+      // Check for class matching subject
       const classRes = schedule && schedule.find(c => primarySubject && (c.name.toLowerCase().includes(primarySubject) || (c.subject && c.subject.toLowerCase().includes(primarySubject))));
 
       if (hasTaskMention && !classRes && !isNegotiatingTime) {
@@ -234,13 +260,12 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       if (isNegotiatingTime && userRawTime !== null) {
         const testMatch = lower.match(/(\w+)\s+test/);
         const confirmedSub = testMatch ? testMatch[1] : (classRes ? classRes.name : "Class");
-        const conflictDate = parseDateFromText(lower) || targetDeadline; // Tries to find date in "Wednesday" or use default
+        const conflictDate = parseDateFromText(lower) || targetDeadline;
 
         const reviewTime = formatTimeFromDecimal(userRawTime);
 
-        // Re-generate the tasks that were "pending"
         newTasks.push({
-          id: crypto.randomUUID(), title: `${confirmedSub} Test`, time: `${formatDate(new Date(conflictDate.getTime() + 86400000))}, 8:00 AM`, // Approximate logic, or just schedule the REVIEW
+          id: crypto.randomUUID(), title: `${confirmedSub} Test`, time: `${formatDate(new Date(conflictDate.getTime() + 86400000))}, 8:00 AM`,
           type: "task", priority: "high", description: `• Exam day.`
         });
         newTasks.push({
@@ -274,7 +299,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
                 id: crypto.randomUUID(), title: `${subName} ${i === 1 ? 'Review' : 'Prep'}`, time: `${formatDate(d)}, ${bestTime}`,
                 duration: "1h", type: "study", priority: "medium",
                 description: getStudyAdvice(subName, i === 1 ? 'final' : 'prep'),
-                resources: [{ label: "Study Coach (AI)", url: "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n" }]
+                resources: getResources(true)
               });
             }
           }

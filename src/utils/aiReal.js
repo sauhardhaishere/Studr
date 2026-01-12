@@ -28,17 +28,18 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
     
     1. **CLASS VERIFICATION & AGENTIC CREATION:**
        - **VERIFICATION**: If a subject is mentioned but not in 'User's Classes', you MUST stop and ask: "I see you have a Spanish test! What's the full name of that class in your schedule?"
-       - **HANDLING REPLIES**: If the user provides a name (e.g., "Spanish 3") in response to your question:
-         - 1. Create the class in \`newClasses\`.
-         - 2. IMMEDIATELY proceed to schedule the originally requested tasks using this new class.
-       - **DATE PRECISION**: cross-check your math 3 times. "This Wednesday" must match the index perfectly.
+       - **HANDLING REPLIES**: If the user provides a name, **AUTOCORRECT TYPOS** (e.g. "Calclus" -> "Calculus") before creating it.
+       - **IMMEDIATE ACTION**: After creating the class, IMMEDIATELY schedule the original request.
 
     2. **STUDY HELPER PROTOCOL (7-DAY PLAN):**
        - **TESTS**: Generate a multi-day plan (Test Task + 2-3 Study/Prep sessions).
        - **ACTIONABLE DESCRIPTIONS**: Every 'description' must be a specific STUDY COACH instruction.
        - **PHASE 1 (Prep sessions)**: Focus on "Reorganizing and Note Preparation". Instructions should mention concept maps, condensed study guides, and identifying key themes.
        - **PHASE 2 (Final Review)**: Focus on "Active Recall and Mock Testing". Instructions should mention timed practice tests, solving missed homework problems, and oral explanations of concepts.
-       - **RESOURCES**: Include: {"label": "Study Coach (AI)", "url": "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n"}.
+       - **RESOURCES**: Include these specific links:
+         - {"label": "Study Coach (AI)", "url": "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n"}
+         - {"label": "Knowt", "url": "https://knowt.com"}
+         - {"label": "Quizlet", "url": "https://quizlet.com"}
 
     3. **SMART GAP-FINDING & DURATION MATH (STRICT):**
        - **DURATION AWARENESS**: Check the start AND end times of existing tasks. If a 1-hour task exists at 5:00 PM, it ends at 6:00 PM. Find a gap before or after.
