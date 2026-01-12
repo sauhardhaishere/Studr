@@ -103,21 +103,17 @@ function App() {
     const saveTasks = async () => {
       try {
         const uId = session.user.id;
-        const validTasks = tasks.map(t => {
-          // Ensure ID is a valid UUID or let Supabase generate one if it looks like a timestamp
-          const isTimestampId = typeof t.id === 'number' || (typeof t.id === 'string' && !t.id.includes('-'));
-          return {
-            ...(isTimestampId ? {} : { id: t.id }), // Only include ID if it looks like a UUID
-            user_id: uId,
-            title: t.title,
-            time: t.time,
-            duration: t.duration,
-            type: t.type,
-            priority: t.priority,
-            description: t.description || '',
-            resources: t.resources || []
-          };
-        });
+        const validTasks = tasks.map(t => ({
+          id: t.id,
+          user_id: uId,
+          title: t.title,
+          time: t.time,
+          duration: t.duration,
+          type: t.type,
+          priority: t.priority,
+          description: t.description || '',
+          resources: t.resources || []
+        }));
 
         const { error } = await supabase.from('tasks').upsert(validTasks);
         if (error) console.error("Error saving tasks:", error);
@@ -136,15 +132,12 @@ function App() {
     const saveSchedule = async () => {
       try {
         const uId = session.user.id;
-        const validClasses = schedule.map(c => {
-          const isTimestampId = typeof c.id === 'number' || (typeof c.id === 'string' && !c.id.includes('-'));
-          return {
-            ...(isTimestampId ? {} : { id: c.id }),
-            user_id: uId,
-            name: c.name,
-            subject: c.subject
-          };
-        });
+        const validClasses = schedule.map(c => ({
+          id: c.id,
+          user_id: uId,
+          name: c.name,
+          subject: c.subject
+        }));
         const { error } = await supabase.from('classes').upsert(validClasses);
         if (error) console.error("Error saving classes:", error);
         else setLastSaved(new Date());
@@ -162,19 +155,16 @@ function App() {
     const saveActivities = async () => {
       try {
         const uId = session.user.id;
-        const validActivities = activities.map(a => {
-          const isTimestampId = typeof a.id === 'number' || (typeof a.id === 'string' && !a.id.includes('-'));
-          return {
-            ...(isTimestampId ? {} : { id: a.id }),
-            user_id: uId,
-            name: a.name,
-            time: a.time,
-            frequency: a.frequency,
-            applied_days: a.appliedDays || [],
-            type: a.type,
-            is_free_slot: a.isFreeSlot
-          };
-        });
+        const validActivities = activities.map(a => ({
+          id: a.id,
+          user_id: uId,
+          name: a.name,
+          time: a.time,
+          frequency: a.frequency,
+          applied_days: a.appliedDays || [],
+          type: a.type,
+          is_free_slot: a.isFreeSlot
+        }));
         const { error } = await supabase.from('activities').upsert(validActivities);
         if (error) console.error("Error saving activities:", error);
         else setLastSaved(new Date());
@@ -254,26 +244,49 @@ function App() {
   };
 
   const handleDeleteTask = async (id) => {
+    // 1. Local update for immediate UI response
     setTasks(prev => prev.filter(t => t.id !== id));
+
+    // 2. Remote update
     if (session) {
-      const { error } = await supabase.from('tasks').delete().eq('id', id);
-      if (error) console.error("Error deleting task:", error);
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', session.user.id);
+
+      if (error) {
+        console.error("Error deleting task:", error);
+        // Optional: Revert local state or show toast
+      } else {
+        setLastSaved(new Date());
+      }
     }
   };
 
   const handleDeleteClass = async (id) => {
     setSchedule(prev => prev.filter(c => c.id !== id));
     if (session) {
-      const { error } = await supabase.from('classes').delete().eq('id', id);
+      const { error } = await supabase
+        .from('classes')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', session.user.id);
       if (error) console.error("Error deleting class:", error);
+      else setLastSaved(new Date());
     }
   };
 
   const handleDeleteActivity = async (id) => {
     setActivities(prev => prev.filter(a => a.id !== id));
     if (session) {
-      const { error } = await supabase.from('activities').delete().eq('id', id);
+      const { error } = await supabase
+        .from('activities')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', session.user.id);
       if (error) console.error("Error deleting activity:", error);
+      else setLastSaved(new Date());
     }
   };
 

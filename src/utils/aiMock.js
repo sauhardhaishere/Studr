@@ -164,7 +164,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           if (chosenSlot) {
             newTasks = [
               {
-                id: Date.now(),
+                id: crypto.randomUUID(),
                 title: `${displayNames[0]} Homework`,
                 time: `${chosenSlot.dateStr}, ${chosenSlot.time}`,
                 duration: "45m",
@@ -174,7 +174,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
                 resources: [{ label: "Study Guide", url: "https://quizlet.com" }]
               },
               {
-                id: Date.now() + 1,
+                id: crypto.randomUUID(),
                 title: `${displayNames[0]} DUE`,
                 time: `${deadlineStr}, 11:59 PM`,
                 duration: "---",
@@ -196,7 +196,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           displayNames.forEach((name, subjectIdx) => {
             // The Test Task (Morning of Test Day)
             newTasks.push({
-              id: Date.now() + (subjectIdx * 100),
+              id: crypto.randomUUID(),
               title: `${name} Test`,
               time: `${deadlineStr}, ${8 + subjectIdx}:15 AM`,
               duration: "1h",
@@ -235,7 +235,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
                 const timeStr = `${h}:${m === 0 ? "00" : m} PM`;
 
                 newTasks.push({
-                  id: Date.now() + (subjectIdx * 100) + i,
+                  id: crypto.randomUUID(),
                   title: `${name} - ${i === 1 ? 'Final Review' : 'Prep Session'}`,
                   time: `${studyDateStr}, ${timeStr}`,
                   duration: "1h",
