@@ -3,7 +3,7 @@
 
 export const simulateAIAnalysis = async (conversationContext, currentTasks, activities, schedule, today = new Date()) => {
   return new Promise((resolve) => {
-    setTimeout(() => {
+    setTimeout(async () => {
       const lower = conversationContext.toLowerCase();
       let message = "";
       let newTasks = [];
@@ -81,7 +81,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       }
 
       // --- SUBJECT DETECTION ---
-      const subjectMap = ["math", "bio", "chem", "english", "history", "physics", "spanish", "calc", "science", "ap"];
+      const subjectMap = ["math", "bio", "chem", "english", "history", "physics", "spanish", "calc", "precalc", "algebra", "geometry", "stats", "science", "ap"];
       const foundSubjects = subjectMap.filter(s => lastUserLower.includes(s));
       const uniqueSubjects = [...new Set(foundSubjects)];
 
@@ -98,6 +98,41 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
       // --- CLASS VERIFICATION (STOP CONDITION) ---
       const missingSubjectIdx = displayNames.findIndex(name => name === null);
+
+      // Check if user is PROVIDING a class name in response to a prompt
+      const lastAILine = lines.filter(l => l.startsWith('Calendly:')).pop() || '';
+      const isAnsweringClassQuestion = lastAILine.includes('full name of this class');
+
+      let pendingSubject = null;
+      if (isAnsweringClassQuestion) {
+        // Find which subject we were waiting on
+        const promptMatch = lastAILine.match(/have a (\w+) test/i);
+        if (promptMatch) pendingSubject = promptMatch[1].toLowerCase();
+      }
+
+      if (isAnsweringClassQuestion && !hasTaskMention && lastUserMsg.length > 2) {
+        // User provided the name! Let's inject a "phantom" class and look back for the task
+        const newClassName = lastUserMsg;
+        const newClassSubject = pendingSubject || "Other";
+        const generatedClasses = [{ name: newClassName, subject: newClassSubject }];
+
+        // Find the ORIGINAL request in the history
+        const originalRequest = lines.slice().reverse().find(l =>
+          l.startsWith('User:') && (l.toLowerCase().includes('test') || l.toLowerCase().includes('quiz') || l.toLowerCase().includes('homework'))
+        )?.replace('User:', '').trim() || lastUserMsg;
+
+        // Recursively or immediately simulate with the new context?
+        // Let's just update the local variables and continue
+        displayNames[0] = newClassName; // Assume it's for the first missing one
+        const deadlineInfo = simulateAIAnalysis(`User: ${originalRequest}`, currentTasks, activities, [...(schedule || []), ...generatedClasses], today);
+
+        return resolve({
+          ...(await deadlineInfo),
+          newClasses: generatedClasses,
+          message: `Perfect! I've added **${newClassName}** to your schedule. Now, let's get that study plan ready for your ${newClassSubject} test!`
+        });
+      }
+
       if (hasTaskMention && missingSubjectIdx !== -1) {
         const sub = uniqueSubjects[missingSubjectIdx];
         const subDisplay = sub.charAt(0).toUpperCase() + sub.slice(1);
