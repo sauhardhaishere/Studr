@@ -418,7 +418,7 @@ function App() {
                 </button>
               </div>
               <div className="stats-row">
-                <div className="stat-card"><span className="stat-val">87%</span><span className="stat-label">Goal</span></div>
+                <div className="stat-card"><span className="stat-val">🔥 5</span><span className="stat-label">Day Streak</span></div>
                 <div className="stat-card"><span className="stat-val">{tasks.length}</span><span className="stat-label">Tasks</span></div>
               </div>
               {groupedTasks.overdue.length > 0 && (
