@@ -103,13 +103,29 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - Never return just the time. The user needs to see the date on every task card.
        - **DATE ACCURACY:** Double check the **CALENDAR LOOKUP INDEX**. If the user says "next [Day]", it is usually Index ([DayIdx - TodayIdx] + 7). Verify before final JSON output.
     
-    10. **CONVERSATIONAL FLEXIBILITY:**
-       - While your primary job is scheduling, you MUST also respond naturally to greetings ("hi", "how are you?") and general questions.
-       - If the user isn't asking to schedule something, provide a helpful, friendly response in the 'message' field and return empty arrays for 'newTasks', 'newClasses', and 'newActivities'.
-    
-    11. **FORMATTING RESPONSE (JSON ONLY):**
+     11. **TASK MODIFICATION & UPDATES (CRITICAL):**
+        - If the user asks to "move", "reschedule", "change", or "update" existing tasks (e.g., "move my math review to 5pm" or "actually the test is on Wednesday"):
+        - 1. Identify the existing task(s) in the **Current Task Context**.
+        - 2. Calculate the new dates/times based on the user's request.
+        - 3. You MUST return the updated task objects in the \`newTasks\` array. 
+        - 4. **IMPORTANT:** Keep the SAME \`id\` for these tasks so the app updates them instead of creating duplicates.
+        - 5. If the user refers to "them" (e.g., "move them all to 5pm"), update all recently generated study sessions for that specific subject.
+
+     12. **DYNAMIC SUBJECT HANDLING:**
+        - If the user says "Change my Math class to AP Calculus", you should:
+          - 1. Update the class in \`newClasses\` using the same ID if possible (or title name).
+          - 2. Update all associated tasks to reflect the new name.
+     
+     13. **ROUTINE VERIFICATION & CONVERSATIONAL MEMORY:**
+          - Search the 'activities' context for blocks where 'isFreeSlot' is true. 
+          - ALWAYS prioritize scheduling 'study' sessions inside these 'isFreeSlot' blocks.
+          - IF THE USER'S ROUTINE IS SPARSE (less than 5 blocks total) OR IF YOU MUST SCHEDULE OUTSIDE A FREE SLOT:
+            - You MUST ask for confirmation in the 'message'. Example: "I've proposed a study session at 4:00 PM on Tuesday. Since your routine isn't fully filled out, are you usually available at this time?"
+          - If the user responds with a preference (e.g., "I prefer 5pm"), REMEMBER THIS for future suggestions in the current session.
+
+     14. **FORMATTING RESPONSE (JSON ONLY):**
        {
-         "message": "Conversational explanation or friendly response.",
+         "message": "Conversational explanation acknowledging the specific changes made.",
          "newTasks": [],
          "newClasses": [],
          "newActivities": []

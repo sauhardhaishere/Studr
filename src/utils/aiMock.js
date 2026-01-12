@@ -23,8 +23,8 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         if (targetIdx === -1) return 3;
 
         let diff = targetIdx - todayIdx;
-        if (diff <= 0) diff += 7;
-        if (isNext && lastUserLower.includes("next " + targetDayName)) diff += 7;
+        if (diff < 0) diff += 7; // It's coming up this week
+        if (isNext) diff += 7; // Force it to next week
 
         return diff;
       };
@@ -323,7 +323,56 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           }
         }
       } else {
-        // --- CHAT / GREETING LOGIC ---
+        // --- MODIFICATION / RESCHEDULE LOGIC ---
+        const isMoveCommand = lastUserLower.includes("move") || lastUserLower.includes("reschedule") || lastUserLower.includes("change");
+        const isBulkMove = isMoveCommand && (lastUserLower.includes("them") || lastUserLower.includes("all"));
+        const timeMatch = lastUserLower.match(/(\d+)\s*(pm|am)/);
+
+        if (isMoveCommand) {
+          const currentTks = currentTasks || [];
+          let modifiedTasks = [];
+          let targetSubject = uniqueSubjects[0] || "";
+
+          if (isBulkMove) {
+            // Find the most recently added study sessions
+            const studySessions = currentTks.filter(t => t.type === 'study');
+            if (timeMatch && studySessions.length > 0) {
+              const newH = parseInt(timeMatch[1]);
+              const ampm = timeMatch[2].toUpperCase();
+
+              modifiedTasks = studySessions.map(t => {
+                const datePart = t.time.split(',')[0];
+                return { ...t, time: `${datePart}, ${newH}:00 ${ampm}` };
+              });
+
+              resolve({
+                newTasks: modifiedTasks,
+                newClasses: [],
+                newActivities: [],
+                message: `No problem! I've moved all your study sessions to **${newH}:00 ${ampm}**. Does this new timing work better for you?`
+              });
+              return;
+            }
+          } else if (timeMatch) {
+            // Single task move... (look for subject)
+            const newH = parseInt(timeMatch[1]);
+            const ampm = timeMatch[2].toUpperCase();
+            const taskToMove = currentTks.find(t => t.title.toLowerCase().includes(targetSubject));
+            if (taskToMove) {
+              const datePart = taskToMove.time.split(',')[0];
+              const updated = { ...taskToMove, time: `${datePart}, ${newH}:00 ${ampm}` };
+              resolve({
+                newTasks: [updated],
+                newClasses: [],
+                newActivities: [],
+                message: `Sure thing! I've updated the **${taskToMove.title}** to **${newH}:00 ${ampm}**.`
+              });
+              return;
+            }
+          }
+        }
+
+        // --- GREETING / CHAT LOGIC ---
         const greetings = ["hi", "hello", "hey", "sup", "yo", "good morning", "good afternoon", "good evening"];
         const feelings = ["how are you", "how's it going", "how are things", "what's up"];
 
