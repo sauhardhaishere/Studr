@@ -73,7 +73,15 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - You MUST NOT generate any tasks, study sessions, or activities for dates/times that have already passed relative to TODAY (e.g., if today is Monday, do not schedule for Sunday).
        - If the user mentions a past event (e.g., "I had a math test yesterday"), acknowledge it politely but do not schedule anything.
 
-    10. **FORMATTING RESPONSE (JSON ONLY):**
+    10. **SPECIFICITY & WORK DURATION:**
+        - Every task 'description' MUST start with a quantitative work requirement.
+        - Example: "• Work for 45 minutes on Practice Set 1. Focus on..."
+        - Be EXTREMELY SPECIFIC about what the user should do during that time.
+
+    11. **USER PREFERENCE PRIORITY:**
+        - If the user says "I'm free 5-6" or "schedule it for 5pm", you MUST use that exact time window and ignore routine 'isFreeSlot' logic for that task.
+
+    12. **FORMATTING RESPONSE (JSON ONLY):**
        {
          "message": "Conversational explanation acknowledging the action or answering the user's question.",
          "newTasks": [],

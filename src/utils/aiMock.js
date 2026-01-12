@@ -39,16 +39,28 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         return dateObj.toLocaleDateString('en-US', { weekday: 'long' });
       };
 
-      const parseTimeToMinutes = (timeStr) => {
-        const match = timeStr.match(/(\d+):?(\d+)?\s*(AM|PM)/i);
-        if (!match) return 1020; // Default 5:00 PM
-        let h = parseInt(match[1]);
-        const m = match[2] ? parseInt(match[2]) : 0;
-        const isPm = match[3] ? match[3].toUpperCase() === 'PM' : h >= 1 && h <= 11; // Guess PM if 1-11
-        if (isPm && h < 12) h += 12;
-        if (!isPm && h === 12) h = 0;
-        return h * 60 + m;
+      // --- SMART TIME PARSER ---
+      const parseUserTime = (text) => {
+        // Look for ranges like "5-6" or "5 to 6" or single times like "5pm"
+        const rangeMatch = text.match(/(\d+)\s*(-|to|until)\s*(\d+)\s*(am|pm)?/i);
+        const singleMatch = text.match(/(\d+):?(\d+)?\s*(am|pm)/i) || text.match(/(\d+)\s*(pm|am)/i);
+
+        if (rangeMatch) {
+          const startH = parseInt(rangeMatch[1]);
+          let ampm = (rangeMatch[4] || 'PM').toUpperCase();
+          // If 5-6 pm, start is 5pm. If 11-12 am, start is 11am.
+          return `${startH}:00 ${ampm}`;
+        }
+        if (singleMatch) {
+          const h = parseInt(singleMatch[1]);
+          const m = singleMatch[2] || "00";
+          const ampm = (singleMatch[3] || 'PM').toUpperCase();
+          return `${h}:${m} ${ampm}`;
+        }
+        return null;
       };
+
+      const userTimePref = parseUserTime(lastUserLower);
 
       // --- DATE PARSING ---
       let targetDeadline = new Date(today);
@@ -63,7 +75,6 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         if (dateMatch) {
           const dayNum = parseInt(dateMatch[1]);
           targetDeadline = new Date(today.getFullYear(), monthIdx, dayNum);
-
           if (targetDeadline < today && !lastUserLower.includes("last") && !lastUserLower.includes("yesterday")) {
             if (today.getMonth() !== monthIdx || today.getDate() !== dayNum) {
               targetDeadline.setFullYear(today.getFullYear() + 1);
@@ -79,24 +90,15 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         else if (lastUserLower.includes("today")) offset = 0;
         else if (lastUserLower.includes("yesterday")) offset = -1;
         else {
-          const foundDay = daysOfWeek
-            .slice()
-            .sort((a, b) => b.length - a.length)
-            .find(d => lastUserLower.includes(d));
-
-          if (foundDay) {
-            offset = getDayOffset(foundDay, lastUserLower.includes("next"));
-          } else {
-            offset = 1; // Default to tomorrow if not specified
-          }
+          const foundDay = daysOfWeek.find(d => lastUserLower.includes(d));
+          if (foundDay) offset = getDayOffset(foundDay, lastUserLower.includes("next"));
+          else offset = 1;
         }
         targetDeadline.setDate(today.getDate() + offset);
       }
 
-      const todayStart = new Date(today);
-      todayStart.setHours(0, 0, 0, 0);
-      const targetStart = new Date(targetDeadline);
-      targetStart.setHours(0, 0, 0, 0);
+      const todayStart = new Date(today); todayStart.setHours(0, 0, 0, 0);
+      const targetStart = new Date(targetDeadline); targetStart.setHours(0, 0, 0, 0);
       if (targetStart < todayStart) isPastDate = true;
 
       // --- SUBJECT DETECTION ---
@@ -106,11 +108,8 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       ];
       const foundSubjects = subjectMap.filter(s => lastUserLower.includes(s));
       const uniqueSubjects = [...new Set(foundSubjects)];
-
       const displayNames = uniqueSubjects.map(s => {
-        const matchingClass = schedule && schedule.find(c =>
-          c.name.toLowerCase().includes(s) || (c.subject && c.subject.toLowerCase().includes(s))
-        );
+        const matchingClass = schedule && schedule.find(c => c.name.toLowerCase().includes(s) || (c.subject && c.subject.toLowerCase().includes(s)));
         return matchingClass ? matchingClass.name : null;
       });
 
@@ -118,156 +117,88 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       const isTest = lastUserLower.includes("test") || lastUserLower.includes("exam") || lastUserLower.includes("quiz");
       const hasTaskMention = isTest || isAssignment || lastUserLower.includes("review") || lastUserLower.includes("study");
 
-      // --- RESOURCE GENERATOR ---
+      // Resources
       const getResourcesForSubject = (subject) => {
         const lower = subject.toLowerCase();
-        if (lower.includes('math') || lower.includes('calc') || lower.includes('algebra')) {
-          return [{ label: "Khan Academy Math", url: "https://www.khanacademy.org/math" }, { label: "WolframAlpha", url: "https://www.wolframalpha.com" }];
-        }
-        if (lower.includes('bio') || lower.includes('chem') || lower.includes('science') || lower.includes('phys')) {
-          return [{ label: "Khan Academy Science", url: "https://www.khanacademy.org/science" }, { label: "BioDigital", url: "https://www.biodigital.com" }];
-        }
-        if (lower.includes('history') || lower.includes('gov')) {
-          return [{ label: "Heimler's History", url: "https://www.youtube.com/@HeimlersHistory" }, { label: "C-SPAN", url: "https://www.c-span.org" }];
-        }
-        return [{ label: "Quizlet", url: "https://quizlet.com" }, { label: "Knowt", url: "https://knowt.com" }];
+        if (lower.includes('math') || lower.includes('calc')) return [{ label: "Khan Academy Math", url: "https://www.khanacademy.org/math" }];
+        return [{ label: "Quizlet", url: "https://quizlet.com" }];
       };
 
-      // --- PREVENT REPEATS ---
+      // Handle Repeat Tests
       const existingTitles = (currentTasks || []).map(t => t.title.toLowerCase());
       const isRepeat = displayNames.some(name => name && existingTitles.some(et => et.includes(name.toLowerCase()) && (et.includes('test') || et.includes('exam'))));
-
       if (isRepeat && isTest && !lastUserLower.includes("move") && !lastUserLower.includes("change")) {
-        return resolve({
-          newTasks: [], newClasses: [], newActivities: [],
-          message: "I notice you already have a test scheduled for that class. Would you like to reschedule the existing one instead?"
-        });
+        return resolve({ newTasks: [], newClasses: [], newActivities: [], message: "You already have a test for this class. Want to reschedule it?" });
       }
 
-      // Past date check
+      // Past check
       if (isPastDate && hasTaskMention) {
-        return resolve({
-          newTasks: [], newClasses: [], newActivities: [],
-          message: `I can't schedule tasks in the past (${formatDate(targetDeadline)}). Let's look forward—any upcoming work I can help with?`
-        });
+        return resolve({ newTasks: [], newClasses: [], newActivities: [], message: "I can't schedule things in the past. What's next on your agenda?" });
       }
 
+      // Conversational State
       const isAnsweringClassQuestion = lastAILower.includes('full name of this class');
-      const isAnsweringAvailability = lastAILower.includes('fill out your daily routine') || lastAILower.includes('are you available at this time');
+      const isAnsweringAvailability = lastAILower.includes('fill out your daily routine') || lastAILower.includes('best time') || lastAILower.includes('are you available');
 
-      if (isAnsweringClassQuestion && !hasTaskMention && lastUserMsg.length > 2) {
-        let pendingSubject = "Other";
-        const promptMatch = lastAILine.match(/have a (\w+) test/i);
-        if (promptMatch) pendingSubject = promptMatch[1].toLowerCase();
-        const newClassName = lastUserMsg;
-        const generatedClasses = [{ name: newClassName, subject: pendingSubject }];
-        const originalRequest = lines.slice().reverse().find(l => l.startsWith('User:') && (l.toLowerCase().includes('test') || l.toLowerCase().includes('quiz') || l.toLowerCase().includes('homework')))?.replace('User:', '').trim() || lastUserMsg;
-        const deadlineInfo = await simulateAIAnalysis(`User: ${originalRequest}`, currentTasks, activities, [...(schedule || []), ...generatedClasses], today);
-        return resolve({ ...deadlineInfo, newClasses: generatedClasses, message: `Added **${newClassName}**. Planning your sessions now!` });
+      // Availability Follow-up
+      if (isAnsweringAvailability && userTimePref) {
+        const subject = uniqueSubjects[0] || "General";
+        const subProper = subject.charAt(0).toUpperCase() + subject.slice(1);
+        const dateStr = formatDate(targetDeadline);
+
+        newTasks = [{
+          id: crypto.randomUUID(),
+          title: `${subProper} Session`,
+          time: `${dateStr}, ${userTimePref}`,
+          duration: "1h", priority: "medium", type: "study",
+          description: `• Work specifically on ${subProper} for 60 minutes. Use the resources below to practice problem sets and active recall.`,
+          resources: getResourcesForSubject(subProper)
+        }];
+        return resolve({ newTasks, newClasses: [], newActivities: [], message: `Perfect! I've pinned your **${subProper}** session for **${userTimePref}** on **${dateStr}**. Study hard!` });
       }
 
-      if (isAnsweringAvailability && lastUserLower.match(/(\d+)\s*(am|pm)/i)) {
-        const timeMatch = lastUserLower.match(/(\d+):?(\d+)?\s*(AM|PM)/i) || lastUserLower.match(/(\d+)\s*(pm|am)/i);
-        if (timeMatch) {
-          const hour = parseInt(timeMatch[1]);
-          const ampm = (timeMatch[timeMatch.length - 1] || 'PM').toUpperCase();
-          const timeStr = `${hour}:00 ${ampm}`;
-          const subject = uniqueSubjects[0] || "General";
-          const subProper = subject.charAt(0).toUpperCase() + subject.slice(1);
-          const dateStr = formatDate(targetDeadline);
-
-          newTasks = [{
-            id: crypto.randomUUID(),
-            title: `${subProper} Work Session`,
-            time: `${dateStr}, ${timeStr}`,
-            duration: "1h",
-            priority: "medium",
-            type: "study",
-            description: `Focus session for ${subProper}.`,
-            resources: getResourcesForSubject(subProper)
-          }];
-          return resolve({ newTasks, newClasses: [], newActivities: [], message: `Pinned your session for **${timeStr}** on **${dateStr}**!` });
-        }
-      }
-
-      if (hasTaskMention && uniqueSubjects.length === 0) {
-        uniqueSubjects.push("General");
-        displayNames[0] = "General Homework/Study";
-      }
-
+      if (hasTaskMention && uniqueSubjects.length === 0) { uniqueSubjects.push("General"); displayNames[0] = "General Homework/Study"; }
       const missingSubjectIdx = displayNames.findIndex(name => name === null);
       if (hasTaskMention && missingSubjectIdx !== -1) {
-        const sub = uniqueSubjects[missingSubjectIdx];
-        return resolve({ newTasks: [], newClasses: [], newActivities: [], message: `I see you have a ${sub} test, but I don't have that class. What's its full name?` });
+        return resolve({ newTasks: [], newClasses: [], newActivities: [], message: `I see you have a ${uniqueSubjects[missingSubjectIdx]} test. What's the full name of the class?` });
       }
 
       if (hasTaskMention && uniqueSubjects.length > 0) {
         const deadlineStr = formatDate(targetDeadline);
         const deadlineDay = getDayNameFromDate(targetDeadline);
+        const taskTime = userTimePref || "4:00 PM";
 
         if (isAssignment) {
-          const routineBlocks = activities || [];
-          const timeInUserMsg = lastUserLower.match(/(\d+)\s*(pm|am)/i);
-
-          if (routineBlocks.length < 1 && !timeInUserMsg) {
-            message = `To schedule your ${uniqueSubjects[0]} perfectly, could you fill out your daily routine in 'My Schedule'? Or just give me a time like "5pm"!`;
-            return resolve({ newTasks: [], message });
-          }
-
-          let chosenSlot = null;
-          if (timeInUserMsg) {
-            const h = parseInt(timeInUserMsg[1]);
-            const ampm = (timeInUserMsg[2] || 'PM').toUpperCase();
-            chosenSlot = { dateStr: deadlineStr, dayName: deadlineDay, time: `${h}:00 ${ampm}` };
-          } else {
-            const freeSlots = routineBlocks.filter(b => b.isFreeSlot);
-            if (freeSlots.length > 0) {
-              const slot = freeSlots[0];
-              chosenSlot = { dateStr: deadlineStr, dayName: deadlineDay, time: slot.time.split(' - ')[0] };
-            }
-          }
-
-          if (chosenSlot) {
-            newTasks = [{
-              id: crypto.randomUUID(),
-              title: `${displayNames[0] || uniqueSubjects[0]} Task`,
-              time: `${chosenSlot.dateStr}, ${chosenSlot.time}`,
-              duration: "1h",
-              type: "study",
-              priority: "medium",
-              description: `Dedicated time to complete your ${displayNames[0] || uniqueSubjects[0]} work.`,
-              resources: getResourcesForSubject(displayNames[0] || uniqueSubjects[0])
-            }];
-            message = `Done! Scheduled for **${chosenSlot.time}** on **${chosenSlot.dateStr}**.`;
-          } else {
-            message = `I couldn't find a free slot. What time works for you?`;
-          }
+          newTasks = [{
+            id: crypto.randomUUID(),
+            title: `${displayNames[0] || uniqueSubjects[0]} Work`,
+            time: `${deadlineStr}, ${taskTime}`,
+            duration: "45m", type: "study", priority: "medium",
+            description: `• Work on ${displayNames[0] || uniqueSubjects[0]} for 45 minutes to ensure completion before the deadline.`,
+            resources: getResourcesForSubject(displayNames[0] || uniqueSubjects[0])
+          }];
+          message = `Done! I've added your **${displayNames[0] || uniqueSubjects[0]}** task for **${taskTime}** on **${deadlineStr}**.`;
         } else {
-          message = `Got it! You have a ${displayNames[0] || uniqueSubjects[0]} test on ${deadlineDay} (${deadlineStr}). I've built a study plan!`;
+          message = `Got it! I've built a specific study plan for your **${displayNames[0] || uniqueSubjects[0]}** test on ${deadlineDay}.`;
           displayNames.forEach((name, idx) => {
             const sub = name || uniqueSubjects[idx];
             newTasks.push({
               id: crypto.randomUUID(),
               title: `${sub} Test`,
-              time: `${deadlineStr}, 8:00 AM`,
-              type: "task",
-              priority: "high",
-              description: `Assessment for ${sub}.`,
+              time: `${deadlineStr}, 8:15 AM`,
+              type: "task", priority: "high",
+              description: `• Official assessment for ${sub}. Ensure you have all materials ready.`,
               resources: getResourcesForSubject(sub)
             });
             for (let i = 1; i <= 2; i++) {
-              const d = new Date(targetDeadline);
-              d.setDate(d.getDate() - i);
-              const dStart = new Date(d); dStart.setHours(0, 0, 0, 0);
-              const nowStart = new Date(today); nowStart.setHours(0, 0, 0, 0);
-              if (dStart >= nowStart) {
+              const d = new Date(targetDeadline); d.setDate(d.getDate() - i);
+              if (d >= todayStart) {
                 newTasks.push({
                   id: crypto.randomUUID(),
                   title: `${sub} ${i === 1 ? 'Final Review' : 'Prep Session'}`,
-                  time: `${formatDate(d)}, 4:00 PM`,
-                  type: "study",
-                  priority: "medium",
-                  description: i === 1 ? `Final brush up for ${sub}.` : `Reviewing core concepts for ${sub}.`,
+                  time: `${formatDate(d)}, ${taskTime}`,
+                  duration: i === 1 ? "1h 30m" : "45m", type: "study", priority: "medium",
+                  description: i === 1 ? `• Detailed study for 90 minutes. Take a practice test and review and weak spots.` : `• Topic review for 45 minutes. Focus on core concepts and vocabulary.`,
                   resources: getResourcesForSubject(sub)
                 });
               }
@@ -275,30 +206,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           });
         }
       } else {
-        const isMove = lastUserLower.includes("move") || lastUserLower.includes("reschedule") || lastUserLower.includes("change");
-        if (isMove && currentTasks && currentTasks.length > 0) {
-          const timeMatch = lastUserLower.match(/(\d+)\s*(pm|am)/i);
-          const targetSubject = (uniqueSubjects[0] || "").toLowerCase();
-          if (timeMatch) {
-            const newH = timeMatch[1];
-            const ampm = (timeMatch[2] || "PM").toUpperCase();
-            const updated = currentTasks.map(t => {
-              if (t.type === 'study' && (targetSubject === "" || t.title.toLowerCase().includes(targetSubject))) {
-                const dateStr = t.time.includes(',') ? t.time.split(',')[0] : formatDate(today);
-                return { ...t, time: `${dateStr}, ${newH}:00 ${ampm}` };
-              }
-              return t;
-            });
-            return resolve({ newTasks: updated, message: `Moved your sessions to ${newH}:00 ${ampm}!` });
-          }
-        }
-
-        const greetings = ["hi", "hello", "hey", "sup", "yo"];
-        if (greetings.some(g => lastUserLower.startsWith(g))) {
-          message = "Hey! Ready to organize? Tell me about a test or homework.";
-        } else {
-          message = "I'm listening! You can schedule tests, homework, or reschedule existing plans.";
-        }
+        message = "I'm ready to help! You can tell me about an upcoming test or homework, or ask me to move your sessions.";
       }
       resolve({ newTasks, newClasses: [], newActivities: [], message });
     }, 800);
