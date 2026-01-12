@@ -40,11 +40,13 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - **PHASE 2 (Final Review)**: Focus on "Active Recall and Mock Testing". Instructions should mention timed practice tests, solving missed homework problems, and oral explanations of concepts.
        - **RESOURCES**: Include: {"label": "Study Coach (AI)", "url": "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n"}.
 
-    3. **ZERO OVERLAP & ROUTINE PRIORITY (STRICT):**
+    3. **ZERO OVERLAP & CONFLICT NEGOTIATION (STRICT):**
        - **NEVER** schedule two tasks at the same time.
-       - **FREE SLOT PRIORITY**: For EVERY task, check 'activities' for an 'isFreeSlot: true' block on that specific date.
-       - YOU MUST prioritize that free slot time over any default (like 4 PM).
-       - If multiple tasks fall on a day with one free slot, start the first at the slot's start time and the next immediately after (e.g., 5 PM, then 6 PM).
+       - **PRIORITIZE ROUTINE**: Check for 'isFreeSlot' on the task date.
+       - **CONFLICT DETECTION**: If you propose a time (e.g., 5 PM) that is ALREADY TAKEN by an existing task in the context:
+         - YOU MUST NOT schedule it automatically.
+         - Instead, ask: "I noticed a conflict on [Day]! What time works best for you to study for [Class] that day?"
+       - **EDUCATION**: Remind users to fill out their full schedule/routine to help you avoid these mistakes!
 
     4. **DATE ACCURACY:**
        - "This [Day]" (e.g., "This Wednesday") ALWAYS refers to the next coming instance of that day in the lookup index.

@@ -65,105 +65,100 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
       // --- SUBJECT DETECTION ---
       const subjectMap = ["math", "bio", "chem", "english", "history", "physics", "spanish", "calc", "precalc", "algebra", "geometry", "stats", "science", "ap"];
-      const foundSubjects = subjectMap.filter(s => lower.includes(s)); // Search entire history
+      const foundSubjects = subjectMap.filter(s => lower.includes(s));
       const uniqueSubjects = [...new Set(foundSubjects)];
 
       const isAssignment = lastUserLower.includes("homework") || lastUserLower.includes("hw") || lastUserLower.includes("assignment");
       const isTest = lastUserLower.includes("test") || lastUserLower.includes("exam") || lastUserLower.includes("quiz") || lower.includes("test");
       const hasTaskMention = isTest || isAssignment;
 
-      // --- AGENTIC MEMORY: Handling class creation replies ---
+      // --- AGENTIC MEMORY ---
       const isAnsweringClassName = lastAILower.includes('full name of that class') || lastAILower.includes("full name of your");
-      const isAnsweringConfirmDate = lastAILower.includes('schedule that') && lastAILower.includes('different day');
+      const isNegotiatingTime = lastAILower.includes('conflict') || lastAILower.includes('is that fine') || lastAILower.includes('what time works');
 
-      // 1. If user confirms date after class creation
-      if (isAnsweringConfirmDate && (lastUserLower.includes("yes") || parseDateFromText(lastUserLower))) {
-        // Carry on to main scheduling logic below...
-      } else if (isAnsweringClassName && lastUserMsg.length > 1 && !hasTaskMention) {
+      if (isAnsweringClassName && lastUserMsg.length > 1 && !hasTaskMention) {
         const subjectFound = subjectMap.find(s => lower.includes(s)) || "General";
         const subCategory = subjectFound.charAt(0).toUpperCase() + subjectFound.slice(1);
         const newClass = { id: crypto.randomUUID(), name: lastUserMsg, subject: subCategory };
         newClasses = [newClass];
-        // We return here to update the state with the NEW class first
         return resolve({
           newTasks: [],
           newClasses,
-          message: `Awesome! I've added **${lastUserMsg}** to your schedule. Should I go ahead and schedule that ${subjectFound} test for this Wednesday?`
+          message: `Awesome! I've added **${lastUserMsg}** to your schedule. Should I go ahead and schedule that study plan for this week?`
         });
       }
 
-      // --- MAIN SCHEDULING LOGIC ---
-      const findClassForSubject = (sub) => schedule && schedule.find(c => c.name.toLowerCase().includes(sub) || (c.subject && c.subject.toLowerCase().includes(sub)));
+      // --- SMART TIME SLOTTING WITH CONFLICT DETECTION ---
+      const routineBlocks = activities || [];
+      const freeSlots = routineBlocks.filter(b => b.isFreeSlot);
+      const allExistingTasks = currentTasks || [];
 
-      if (hasTaskMention && uniqueSubjects.length > 0) {
-        const primarySubject = uniqueSubjects[0];
-        let classRes = findClassForSubject(primarySubject);
+      const getSlotWithConflictCheck = (date) => {
+        const dStr = formatDate(date);
+        const dName = getDayNameFromDate(date);
+        const slot = freeSlots.find(s => s.appliedDays?.includes(dName)) || freeSlots.find(s => s.frequency === 'daily');
 
-        // If we just created the class in the context of this transaction, we might not have it in 'schedule' yet
-        // However, the above 'isAnsweringClassName' block handles the creation turn.
-        // This block handles the FOLLOW-UP turn where the class is now in the schedule.
-
-        if (!classRes) {
-          return resolve({ newTasks: [], message: `I see you have a ${primarySubject} test! What's the full name of that class in your schedule?` });
+        let proposedH = 16; // 4 PM
+        if (slot) {
+          const m = slot.time.match(/(\d+)/);
+          if (m) proposedH = parseInt(m[1]) + (slot.time.includes('PM') && parseInt(m[1]) < 12 ? 12 : 0);
         }
 
+        // Check against existing tasks
+        const hasConflict = allExistingTasks.some(t => t.time.includes(dStr) && t.time.includes(`${proposedH > 12 ? proposedH - 12 : (proposedH === 0 ? 12 : proposedH)}:00`));
+
+        return { hour: proposedH, hasConflict, displayTime: `${proposedH > 12 ? proposedH - 12 : (proposedH === 0 ? 12 : proposedH)}:00 ${proposedH >= 12 ? 'PM' : 'AM'}` };
+      };
+
+      // --- MAIN SCHEDULING LOGIC ---
+      const primarySubject = uniqueSubjects[0];
+      const classRes = schedule && schedule.find(c => c.name.toLowerCase().includes(primarySubject) || (c.subject && c.subject.toLowerCase().includes(primarySubject)));
+
+      if (hasTaskMention && !classRes) {
+        return resolve({ newTasks: [], message: `I see you have a ${primarySubject} test! What's the full name of that class in your schedule?` });
+      }
+
+      if (hasTaskMention && classRes) {
         const subName = classRes.name;
         const deadlineStr = formatDate(targetDeadline);
-
-        // --- STUDY HELPER COACHING ---
-        const getStudyAdvice = (sub, stage) => {
-          const s = sub.toLowerCase();
-          if (stage === 'final') {
-            if (s.includes('math') || s.includes('calc')) return "• Work for 60 minutes. Complete a full practice test under timed conditions. Review your 'error log'.";
-            if (s.includes('latin') || s.includes('spanish') || s.includes('english')) return "• Work for 60 minutes. Conduct a mock conversation or vocabulary blitz. Use active recall on every key term.";
-            return "• Work for 60 minutes. Conduct a mock exam. Use active recall on every key concept.";
-          }
-          return "• Work for 45 minutes. Re-organize your notes and identify the 5 most likely exam topics.";
-        };
-
-        const getResources = (isReview = false) => {
-          const res = [{ label: "Quizlet", url: "https://quizlet.com" }];
-          if (isReview) res.push({ label: "Study Coach (AI)", url: "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n" });
-          return res;
-        };
-
-        // --- TIME SLOTTING ---
-        const routineBlocks = activities || [];
-        const freeSlots = routineBlocks.filter(b => b.isFreeSlot);
-        const getSlot = (date, idx) => {
-          const dName = getDayNameFromDate(date);
-          const slot = freeSlots.find(s => s.appliedDays?.includes(dName)) || freeSlots.find(s => s.frequency === 'daily');
-          let h = 16; // 4 PM
-          if (slot) {
-            const m = slot.time.match(/(\d+)/);
-            if (m) h = parseInt(m[1]) + (slot.time.includes('PM') && parseInt(m[1]) < 12 ? 12 : 0);
-          }
-          h += idx; // Shift for multiple tasks
-          return `${h > 12 ? h - 12 : h}:00 ${h >= 12 ? 'PM' : 'AM'}`;
-        };
+        let foundConflict = false;
+        let conflictDay = "";
 
         if (isTest) {
           newTasks.push({
             id: crypto.randomUUID(), title: `${subName} Test`, time: `${deadlineStr}, 8:00 AM`,
-            type: "task", priority: "high", description: `• Exam day for ${subName}.`, resources: getResources(false)
+            type: "task", priority: "high", description: `• Exam day for ${subName}.`, resources: [{ label: "Quizlet", url: "https://quizlet.com" }]
           });
+
           for (let i = 1; i <= 2; i++) {
             const d = new Date(targetDeadline); d.setDate(d.getDate() - i);
             if (d >= today) {
-              const t = getSlot(d, i - 1);
+              const slotInfo = getSlotWithConflictCheck(d);
+              if (slotInfo.hasConflict) {
+                foundConflict = true;
+                conflictDay = getDayNameFromDate(d);
+              }
               newTasks.push({
-                id: crypto.randomUUID(), title: `${subName} ${i === 1 ? 'Review' : 'Prep'}`, time: `${formatDate(d)}, ${t}`,
+                id: crypto.randomUUID(), title: `${subName} ${i === 1 ? 'Review' : 'Prep'}`, time: `${formatDate(d)}, ${slotInfo.displayTime}`,
                 duration: "1h", type: "study", priority: "medium",
-                description: getStudyAdvice(subName, i === 1 ? 'final' : 'prep'), resources: getResources(true)
+                description: i === 1 ? `• Timed practice test for ${subName}.` : `• Concept mapping for ${subName}.`,
+                resources: [{ label: "Study Coach (AI)", url: "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n" }]
               });
             }
           }
+
+          if (foundConflict) {
+            return resolve({
+              newTasks: [], // Stop until we confirm time
+              message: `I noticed a conflict on **${conflictDay}** — you already have something scheduled during your usual study time. What time works best for you to study for **${subName}** that day?\n\n*Pro-tip: Fill out your full class schedule and routine blocks to help me avoid these overlaps!*`
+            });
+          }
+
           return resolve({ newTasks, message: `Perfect! I've mapped out a high-performance study plan for your **${subName}** test on ${deadlineStr}. You're going to crush it!` });
         }
       }
 
-      // Default Greeting
-      resolve({ newTasks: [], message: "I'm ready! Tell me about a test or homework you have coming up." });
+      resolve({ newTasks: [], message: "Hey there! I'm Calendly. Ready to build a high-performance study plan?" });
     }, 800);
   });
 };
