@@ -87,7 +87,6 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
             const typo = Object.keys(dayTypos).find(t => lastUserLower.includes(t));
             if (typo) foundDay = dayTypos[typo];
           }
-
           if (foundDay) offset = getDayOffset(foundDay, lastUserLower.includes("next"));
           else offset = 3;
         }
@@ -108,11 +107,19 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       const hasTaskMention = isTest || isAssignment || lastUserLower.includes("review") || lastUserLower.includes("study");
 
       // --- RESOURCES ---
-      const getResources = (sub) => {
+      const getResources = (sub, isReviewAndStudy = false) => {
         const s = sub.toLowerCase();
-        if (s.includes('math') || s.includes('calc')) return [{ label: "Khan Academy Math", url: "https://www.khanacademy.org/math" }];
-        if (s.includes('bio') || s.includes('science')) return [{ label: "BioDigital", url: "https://www.biodigital.com" }];
-        return [{ label: "Quizlet", url: "https://quizlet.com" }];
+        const resources = [];
+        // Mandatory Play Lab link for all study/review tasks
+        if (isReviewAndStudy) {
+          resources.push({ label: "Study Coach (AI)", url: "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n" });
+        }
+        if (s.includes('math') || s.includes('calc')) resources.push({ label: "Khan Academy Math", url: "https://www.khanacademy.org/math" });
+        if (s.includes('bio') || s.includes('science')) resources.push({ label: "BioDigital", url: "https://www.biodigital.com" });
+        if (resources.length === 0 || (isReviewAndStudy && resources.length === 1)) {
+          resources.push({ label: "Quizlet", url: "https://quizlet.com" });
+        }
+        return resources;
       };
 
       // --- AVAILABILITY LOOKUP ---
@@ -139,7 +146,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           time: `${formatDate(targetDeadline)}, ${finalTime}`,
           duration: "1h", type: "study", priority: "medium",
           description: `• Work for 60 minutes. Focus on key terms and practice problems.`,
-          resources: getResources(subject)
+          resources: getResources(subject, true)
         }];
 
         if (userTimePref) {
@@ -179,7 +186,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           newTasks = [{
             id: crypto.randomUUID(), title: `${sub} Work`, time: `${deadlineStr}, ${finalTime}`,
             duration: "45m", type: "study", priority: "medium",
-            description: `• Work for 45 minutes to finish your ${sub} homework.`, resources: getResources(sub)
+            description: `• Work for 45 minutes to finish your ${sub} homework.`, resources: getResources(sub, true)
           }];
           return resolve({ newTasks, message: `Scheduled your **${sub}** homework for **${finalTime}** on **${deadlineStr}**.` });
 
@@ -187,7 +194,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           // TEST PLAN (WITH REVIEWS)
           newTasks.push({
             id: crypto.randomUUID(), title: `${sub} Test`, time: `${deadlineStr}, 8:00 AM`,
-            type: "task", priority: "high", description: `• Main assessment for ${sub}.`, resources: getResources(sub)
+            type: "task", priority: "high", description: `• Main assessment for ${sub}.`, resources: getResources(sub, false)
           });
 
           // Reviews
@@ -202,11 +209,11 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
                 time: `${formatDate(d)}, ${rTime}`,
                 duration: i === 1 ? "1h" : "45m", type: "study", priority: "medium",
                 description: `• ${i === 1 ? 'Final brush up' : 'Study'} for ${sub} for ${i === 1 ? '60' : '45'} minutes.`,
-                resources: getResources(sub)
+                resources: getResources(sub, true)
               });
             }
           }
-          return resolve({ newTasks, message: `Got it! Created a study plan for your **${sub}** test. I've scheduled reviews leading up to ${deadlineStr}.` });
+          return resolve({ newTasks, message: `Got it! Created a study plan for your **${sub}** test with reviews leading up to ${deadlineStr}.` });
         }
       }
 

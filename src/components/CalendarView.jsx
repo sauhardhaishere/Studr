@@ -65,48 +65,15 @@ const CalendarView = ({ tasks }) => {
     const getTasksForDay = (item) => {
         if (!item || !item.day) return [];
         const targetDate = new Date(currentYear, currentDate.getMonth() + item.monthOffset, item.day);
-        const today = new Date();
-
-        today.setHours(0, 0, 0, 0);
         targetDate.setHours(0, 0, 0, 0);
-
-        const tomorrow = new Date(today);
-        tomorrow.setDate(today.getDate() + 1);
+        const targetTime = targetDate.getTime();
 
         return tasks.filter(task => {
-            if (!task.time) return false;
-            const lowerTime = task.time.toLowerCase();
-
-            if (lowerTime.includes('today')) {
-                return targetDate.getTime() === today.getTime();
-            }
-            if (lowerTime.includes('tomorrow')) {
-                return targetDate.getTime() === tomorrow.getTime();
-            }
-
-            const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-            const taskDayIndex = daysOfWeek.findIndex(d => lowerTime.includes(d));
-
-            if (taskDayIndex !== -1) {
-                if (targetDate.getDay() === taskDayIndex) {
-                    const diffDays = Math.round((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                    if (lowerTime.includes('next')) {
-                        return diffDays >= 2 && diffDays <= 14;
-                    } else {
-                        return diffDays >= 0 && diffDays <= 7;
-                    }
-                }
-            }
-
-            const monthName = targetDate.toLocaleString('default', { month: 'short' });
-            const dayNum = item.day.toString();
-
-            if (task.time.includes(monthName) && (task.time.includes(` ${dayNum} `) || task.time.includes(` ${dayNum},`) || task.time.endsWith(` ${dayNum}`))) {
-                return true;
-            }
-            if (task.time.includes(monthName) && task.time.includes(dayNum + "th")) return true;
-
-            return false;
+            const dateVal = getTaskDateValue(task);
+            if (!dateVal) return false;
+            const taskDate = new Date(dateVal);
+            taskDate.setHours(0, 0, 0, 0);
+            return taskDate.getTime() === targetTime;
         });
     };
 
