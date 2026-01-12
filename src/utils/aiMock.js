@@ -20,7 +20,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       const daysOfWeek = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
       const dayTypos = {
         "thurs": "thursday", "thur": "thursday", "thrudsay": "thursday", "thrusday": "thursday",
-        "tues": "tuesday", "tuseday": "tuesday", "wednes": "wednesday", "weds": "wednesday",
+        "tues": "tuesday", "tuseday": "tuesday", "wednes": "wednesday", "wenesday": "wednesday", "wed": "wednesday", "weds": "wednesday",
         "mon": "monday", "fri": "friday", "sat": "saturday", "sun": "sunday"
       };
 
@@ -30,11 +30,8 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         if (targetIdx === -1) return 3;
         let diff = targetIdx - todayIdx;
 
-        // "This Wednesday" should be the very next Wednesday.
-        // If today is Wednesday, diff is 0. We usually want NEXT week or today? 
-        // Typically "This Wednesday" means the one coming up.
         if (diff < 0) diff += 7;
-        if (diff === 0 && !lower.includes("today")) diff = 7; // If I say "Wednesday" on Wednesday, I usually mean next week unless I say "today"
+        if (diff === 0 && !lastUserLower.includes("today")) diff = 7;
 
         if (isNext) diff += 7;
         return diff;
@@ -73,10 +70,14 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       else if (lastUserLower.includes("today")) { offset = 0; dateParsed = true; }
       else if (lastUserLower.includes("yesterday")) { offset = -1; dateParsed = true; }
       else {
+        // Find best match for day
         let foundDay = daysOfWeek.find(d => lastUserLower.includes(d));
         if (!foundDay) {
-          const typo = Object.keys(dayTypos).find(t => lastUserLower.includes(t));
-          if (typo) foundDay = dayTypos[typo];
+          // Check typos and common starts
+          const typoKey = Object.keys(dayTypos).find(t => lastUserLower.includes(t));
+          if (typoKey) foundDay = dayTypos[typoKey];
+          else if (lastUserLower.includes("wen")) foundDay = "wednesday";
+          else if (lastUserLower.includes("thr")) foundDay = "thursday";
         }
         if (foundDay) {
           offset = getDayOffset(foundDay, lastUserLower.includes("next"));
@@ -90,7 +91,6 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       const foundSubjects = subjectMap.filter(s => lastUserLower.includes(s));
       const uniqueSubjects = [...new Set(foundSubjects)];
 
-      // CRITICAL: Check if class exists
       const matchedClasses = uniqueSubjects.map(s => {
         return schedule && schedule.find(c => c.name.toLowerCase().includes(s) || (c.subject && c.subject.toLowerCase().includes(s)));
       });
@@ -99,34 +99,32 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       const isTest = lastUserLower.includes("test") || lastUserLower.includes("exam") || lastUserLower.includes("quiz");
       const hasTaskMention = isTest || isAssignment || lastUserLower.includes("review") || lastUserLower.includes("study");
 
-      // --- STOP CONDITION: Missing Class ---
+      // Stop Condition for missing class
       if (hasTaskMention && uniqueSubjects.length > 0) {
         const missingIdx = matchedClasses.findIndex(c => !c);
         if (missingIdx !== -1) {
           return resolve({
             newTasks: [],
-            message: `I see you have a ${uniqueSubjects[missingIdx]} test coming up, but I couldn't find a matching class in your schedule. What's the full name of your ${uniqueSubjects[missingIdx]} class?`
+            message: `I see you have a ${uniqueSubjects[missingIdx]} test coming up! What's the full name of that class in your schedule so I can add it correctly?`
           });
         }
       }
 
       // --- RESOURCES ---
-      const getResources = (sub, isReviewAndStudy = false) => {
+      const getResources = (sub, isReview = false) => {
         const resources = [];
-        if (isReviewAndStudy) {
-          resources.push({ label: "Study Coach (AI)", url: "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n" });
-        }
+        if (isReview) resources.push({ label: "Study Coach (AI)", url: "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n" });
         resources.push({ label: "Quizlet", url: "https://quizlet.com" });
         return resources;
       };
 
-      // --- HELPER: Conflict-Free Timing ---
-      let currentHour = userTimePref ? userTimePref.hour : 16; // Default 4 PM
-      const getNextTime = () => {
-        const ampm = currentHour >= 12 ? "PM" : "AM";
-        const displayH = currentHour > 12 ? currentHour - 12 : (currentHour === 0 ? 12 : currentHour);
-        const timeStr = `${displayH}:00 ${ampm}`;
-        currentHour++; // Increment for next task to avoid overlap
+      // --- OVERLAP PREVENTION ---
+      let startHour = userTimePref ? userTimePref.hour : 16;
+      const getSlotTime = () => {
+        const ampm = startHour >= 12 ? "PM" : "AM";
+        const h = startHour > 12 ? startHour - 12 : (startHour === 0 ? 12 : startHour);
+        const timeStr = `${h}:00 ${ampm}`;
+        startHour++; // Move to next slot
         return timeStr;
       };
 
@@ -136,15 +134,14 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         const deadlineStr = formatDate(targetDeadline);
 
         if (isAssignment) {
-          const taskTime = getNextTime();
+          const t = getSlotTime();
           newTasks = [{
-            id: crypto.randomUUID(), title: `${sub} Work`, time: `${deadlineStr}, ${taskTime}`,
+            id: crypto.randomUUID(), title: `${sub} Work`, time: `${deadlineStr}, ${t}`,
             duration: "45m", type: "study", priority: "medium",
             description: `• Work for 45 minutes on ${sub}.`, resources: getResources(sub, true)
           }];
-          return resolve({ newTasks, message: `Alright! I've added that ${sub} assignment for ${taskTime} on ${deadlineStr}.` });
-        } else {
-          // TEST PLAN
+          return resolve({ newTasks, message: `Alright! I've added that ${sub} assignment for ${t} on ${deadlineStr}.` });
+        } else if (isTest) {
           newTasks.push({
             id: crypto.randomUUID(), title: `${sub} Test`, time: `${deadlineStr}, 8:00 AM`,
             type: "task", priority: "high", description: `• Exam day for ${sub}. Good luck!`, resources: getResources(sub, false)
@@ -152,9 +149,9 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           for (let i = 1; i <= 2; i++) {
             const d = new Date(targetDeadline); d.setDate(d.getDate() - i);
             if (d >= today) {
-              const taskTime = getNextTime();
+              const t = getSlotTime();
               newTasks.push({
-                id: crypto.randomUUID(), title: `${sub} ${i === 1 ? 'Review' : 'Prep'}`, time: `${formatDate(d)}, ${taskTime}`,
+                id: crypto.randomUUID(), title: `${sub} ${i === 1 ? 'Review' : 'Prep'}`, time: `${formatDate(d)}, ${t}`,
                 duration: "1h", type: "study", priority: "medium",
                 description: `• Spend an hour preparing for your ${sub} exam.`, resources: getResources(sub, true)
               });
@@ -164,7 +161,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         }
       }
 
-      resolve({ newTasks: [], message: "Hey there! I'm Calendly. Need help scheduling a test or some homework?" });
+      resolve({ newTasks: [], message: "Hey! I'm Calendly. Need a hand with your school schedule?" });
     }, 800);
   });
 };

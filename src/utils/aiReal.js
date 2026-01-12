@@ -26,12 +26,10 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
     CALENDAR LOOKUP INDEX:
     ${calendarTable}
     
-    1. **CLASS VERIFICATION (MANDATORY STOP CONDITION):**
-       - You MUST check the 'User's Classes' list.
-       - **IF NO MATCH IS FOUND** (nothing matches the name OR the category):
-         - YOU MUST NOT generate any tasks.
-         - Ask for the class name in a friendly way. Example: "I see you have a History test! What's the full name of your History class so I can add it to your schedule?"
-       - **IF MATCHED**: Always use the formal \`name\` from the schedule (e.g., "AP Precalculus" instead of "Math").
+    1. **CLASS VERIFICATION & DATE PRECISION:**
+       - **FUZZY DAYS**: Be extremely resilient to typos (e.g., "wenesday" -> Wednesday, "thr" -> Thursday). Match them to the closest logical day in the index.
+       - **CROSS-CHECK**: Verify the Month and Day match the index. Cross-check your math 3 times before outputting.
+       - **STOP CONDITION**: If the subject is not in the 'User's Classes' list, you MUST stop and ask for the name in a friendly way.
 
     2. **STUDY PROTOCOL & RESOURCES:**
        - **TESTS**: Generate a multi-day plan (Test Task + 2-3 Study/Prep sessions leading up to it).
