@@ -87,8 +87,22 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
       // --- SUBJECT DETECTION ---
       const subjectMap = ["math", "bio", "chem", "english", "history", "physics", "spanish", "calc", "precalc", "algebra", "geometry", "stats", "science", "ap"];
-      const foundSubjects = subjectMap.filter(s => lower.includes(s));
+
+      // 1. Check CURRENT message first (Priority)
+      let foundSubjects = subjectMap.filter(s => lastUserLower.includes(s));
+
+      // 2. Fallback to History only if ambiguous
+      if (foundSubjects.length === 0) {
+        // Scan reversed history to find the LATEST mentioned subject
+        for (let i = lines.length - 1; i >= 0; i--) {
+          const lineLow = lines[i].toLowerCase();
+          const hit = subjectMap.find(s => lineLow.includes(s));
+          if (hit) { foundSubjects = [hit]; break; }
+        }
+      }
+
       const uniqueSubjects = [...new Set(foundSubjects)];
+      const primarySubject = uniqueSubjects[0];
 
       const isAssignment = lastUserLower.includes("homework") || lastUserLower.includes("hw") || lastUserLower.includes("assignment");
       const isTest = lastUserLower.includes("test") || lastUserLower.includes("exam") || lastUserLower.includes("quiz") || lower.includes("test");
@@ -99,7 +113,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       const isNegotiatingTime = lastAILower.includes('conflict') || lastAILower.includes('what time works');
 
       if (isAnsweringClassName && lastUserMsg.length > 1 && !hasTaskMention) {
-        const subjectFound = subjectMap.find(s => lower.includes(s)) || "General";
+        const subjectFound = primarySubject || "General";
         const subCategory = subjectFound.charAt(0).toUpperCase() + subjectFound.slice(1);
         const newClass = { id: crypto.randomUUID(), name: lastUserMsg, subject: subCategory };
         return resolve({
@@ -154,19 +168,19 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       };
 
       // --- MAIN SCHEDULING ---
-      const classRes = schedule && schedule.find(c => subjectMap.some(s => lower.includes(s) && (c.name.toLowerCase().includes(s) || (c.subject && c.subject.toLowerCase().includes(s)))));
+      const classRes = schedule && schedule.find(c => primarySubject && (c.name.toLowerCase().includes(primarySubject) || (c.subject && c.subject.toLowerCase().includes(primarySubject))));
 
       if (hasTaskMention && !classRes && !isNegotiatingTime) {
-        return resolve({ newTasks: [], message: `I see you have a test coming up! What's the full name of that class in your schedule?` });
+        return resolve({ newTasks: [], message: `I see you have a ${primarySubject || 'class'} test coming up! What's the full name of that class in your schedule?` });
       }
 
-      const subName = classRes ? classRes.name : uniqueSubjects[0] || "General";
+      const subName = classRes ? classRes.name : (primarySubject ? primarySubject.charAt(0).toUpperCase() + primarySubject.slice(1) : "General");
 
       // If user provided a time during negotiation
       if (isNegotiatingTime && userRawTime !== null) {
         // Find what they were scheduling - check history
         const testMatch = lower.match(/(\w+)\s+test/);
-        const confirmedSub = testMatch ? testMatch[1] : subName;
+        const confirmedSub = testMatch ? testMatch[1] : (primarySubject || subName);
         const targetDate = parseDateFromText(lower) || targetDeadline;
 
         // Force create the plan with the user's time
