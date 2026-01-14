@@ -225,6 +225,11 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       const isAnsweringClassName = lastAILower.includes('full name of that class') || lastAILower.includes("full name of your");
       const isNegotiatingTime = lastAILower.includes('conflict') || lastAILower.includes('what time works');
       const isIntensityRequest = lastAILower.includes('intensity') || lastAILower.includes('study mode');
+      const isCancellation = lastUserLower.includes('nevermind') || lastUserLower.includes('cancel') || lastUserLower.includes('forget it');
+
+      if (isCancellation) {
+        return resolve({ newTasks: [], message: "No problem. Let me know if you need anything else!" });
+      }
 
       if (isAnsweringClassName && lastUserMsg.length > 1 && !currentMsgIsTask) {
         // Auto Correct The Name
@@ -245,7 +250,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         // 3. Check if we need intensity
         const diffDays = Math.floor((originalDate - today) / (1000 * 60 * 60 * 24));
         if (diffDays > 14) {
-          return resolve({ newClasses, message: `Perfect! I've added **${correctedName}** to your schedule. Since this test is over 2 weeks away, what study intensity do you prefer: **Normal**, **Moderate**, or **Hardcore**?` });
+          return resolve({ newClasses, message: `Perfect! I've added ${correctedName} to your schedule. Since this test is over 2 weeks away, what study intensity do you prefer: Normal, Moderate, or Hardcore?` });
         }
 
         // 4. IMMEDIATELY Schedule the Tasks
@@ -276,7 +281,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         return resolve({
           newTasks,
           newClasses,
-          message: `Perfect! I've added **${subName}** to your schedule and mapped out a ${sessions}-day study plan for ${deadlineStr}.`
+          message: `Perfect! I've added ${subName} to your schedule and mapped out a ${sessions}-day study plan for ${deadlineStr}.`
         });
       }
 
@@ -310,7 +315,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
             }
           }
         }
-        return resolve({ newTasks, message: `Got it! I've mapped out a **${intensity}** study plan with ${sessions} sessions leading up to your test on ${deadlineStr}.` });
+        return resolve({ newTasks, message: `Got it! I've mapped out a ${intensity} study plan with ${sessions} sessions leading up to your test on ${deadlineStr}.` });
       }
 
       // --- MAIN SCHEDULING (Standard Flow) ---
@@ -364,7 +369,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         const diffDays = Math.floor((targetDeadline - today) / (1000 * 60 * 60 * 24));
 
         if (diffDays > 14) {
-          return resolve({ newTasks: [], message: `I've noted your ${subName} test for ${deadlineStr}. Since it's quite a bit away, would you like a **Normal**, **Moderate**, or **Hardcore** study plan?` });
+          return resolve({ newTasks: [], message: `I've noted your ${subName} test for ${deadlineStr}. Since it's quite a bit away, would you like a Normal, Moderate, or Hardcore study plan?` });
         }
 
         let missingSpotDay = null;
