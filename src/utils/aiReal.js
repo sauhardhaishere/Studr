@@ -53,7 +53,13 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - **USER OVERRIDE**: If user says "any" or "anytime", pick 4 PM or the best available slot between 3 PM and 9 PM.
        - **NO BOLDING**: Do NOT use **bold** in your response messages.
 
-    5. **FORMATTING RESPONSE (JSON ONLY):**
+    5. **RESOURCES & ASSETS**:
+       - ALWAYS include these resources in EVERY study/prep task:
+         1. {"label": "Study Coach (AI)", "url": "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n"}
+         2. {"label": "Knowt", "url": "https://knowt.com"}
+         3. {"label": "Quizlet", "url": "https://quizlet.com"}
+
+    6. **FORMATTING RESPONSE (JSON ONLY):**
        {
          "message": "A note about what you found on the web and why this plan is optimized.",
          "newTasks": [],
@@ -67,8 +73,12 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
             ? `\n\nUser's Classes:\n${schedule.map(c => `- ${c.name} (${c.subject})`).join('\n')}`
             : "";
 
-        if (onStep) onStep("Connecting to global academic database...");
-        await sleep(800);
+        const isSearchNeeded = userInput.toLowerCase().includes("test") || userInput.toLowerCase().includes("exam") || userInput.toLowerCase().includes("gaokao") || userInput.toLowerCase().includes("sat") || userInput.toLowerCase().includes("act");
+
+        if (onStep && isSearchNeeded) {
+            onStep("Connecting to global academic database...");
+            await sleep(500);
+        }
 
         // --- WEB SEARCH ENGINE ---
         let webContext = "";
@@ -77,8 +87,10 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
         // Smart extraction for search
         const probableSubject = userInput.match(/(?:test|exam|quiz|for)\s+([a-zA-Z0-9\s]{2,20})/i)?.[1] || userInput.split(' ').slice(0, 3).join(' ');
 
-        if (onStep) onStep(`Searching the live web for "${probableSubject}" study strategies...`);
-        searchResults = await searchWebForStrategy(probableSubject);
+        if (isSearchNeeded) {
+            if (onStep) onStep(`Searching the live web for "${probableSubject}" study strategies...`);
+            searchResults = await searchWebForStrategy(probableSubject);
+        }
 
         if (searchResults && searchResults.answer) {
             if (onStep) onStep(`Condensing real-time insights for ${probableSubject}...`);
