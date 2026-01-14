@@ -74,6 +74,7 @@ function App() {
   const [input, setInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isChatExpanded, setIsChatExpanded] = useState(true);
+  const [thinkingStep, setThinkingStep] = useState(null);
   const [lastSaved, setLastSaved] = useState(null);
   const [editingTask, setEditingTask] = useState(null);
   const [isAddingTask, setIsAddingTask] = useState(false); // Manual Task Modal State
@@ -244,12 +245,17 @@ function App() {
       let result = null;
       try {
         const { generateScheduleFromAI } = await import('./utils/aiReal');
-        result = await generateScheduleFromAI(fullContext, tasks, activities, schedule, aiKey);
+        result = await generateScheduleFromAI(fullContext, tasks, activities, schedule, aiKey, (step) => {
+          setThinkingStep(step);
+        });
       } catch (e) { console.error("AI Error:", e); }
       if (!result) {
         const { simulateAIAnalysis } = await import('./utils/aiMock');
-        result = await simulateAIAnalysis(fullContext, tasks, activities, schedule);
+        result = await simulateAIAnalysis(fullContext, tasks, activities, schedule, new Date(), (step) => {
+          setThinkingStep(step);
+        });
       }
+      setThinkingStep(null);
 
       const incomingTasks = result.newTasks || result.generatedSchedule || [];
       const incomingClasses = result.newClasses || [];
@@ -726,7 +732,15 @@ function App() {
               </div>
             ))
           )}
-          {isProcessing && <div className="chat-bubble ai"><span className="chat-avatar">...</span><div className="bubble-content">Thinking...</div></div>}
+          {isProcessing && (
+            <div className="chat-bubble ai processing">
+              <span className="chat-avatar">...</span>
+              <div className="bubble-content">
+                <div className="thinking-dots">Thinking...</div>
+                {thinkingStep && <div className="thinking-step">{thinkingStep}</div>}
+              </div>
+            </div>
+          )}
         </div>
         <div className="chat-input-area">
           <div className="ai-input-bar">

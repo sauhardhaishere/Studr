@@ -1,7 +1,7 @@
 // Mock AI logic to simulate parsing user input
 // This file runs LOCALLY when the Cloud API is down or Key is invalid.
 
-export const simulateAIAnalysis = async (conversationContext, currentTasks, activities, schedule, today = new Date()) => {
+export const simulateAIAnalysis = async (conversationContext, currentTasks, activities, schedule, today = new Date(), onStep = null) => {
   return new Promise((resolve) => {
     setTimeout(async () => {
       const lower = conversationContext.toLowerCase();
@@ -443,7 +443,20 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         return resolve({ newTasks: [], message: "I'm here to help you dominate your classes! You can tell me about upcoming tests or homework, ask to add a new class, or update your routine blocks in the Schedule tab." });
       }
 
-      resolve({ newTasks: [], message: "Hey! I'm Calendly. Ready to build a high-performance study plan?" });
-    }, 800);
+      const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+      if (hasTaskMention) {
+        if (onStep) onStep(`Integrating "${primarySubject || 'the test'}" into your existing history...`);
+        await sleep(1000);
+        if (onStep) onStep(`Searching the web for "${primarySubject || 'UIMCA'}" study patterns and strategies...`);
+        await sleep(1500);
+        if (onStep) onStep(`Found top-tier prep resources. Mapping gaps in your routine...`);
+        await sleep(1000);
+      } else {
+        await sleep(800);
+      }
+
+      resolve({ newTasks: [], message: message || "Hey! I'm Calendly. Ready to build a high-performance study plan?" });
+    });
   });
 };

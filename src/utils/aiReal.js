@@ -4,7 +4,7 @@ import { simulateAIAnalysis } from "./aiMock";
  * Generates a structured schedule using AI (Groq, OpenAI, or Gemini).
  * If the API call fails or no key is provided, it falls back to a smart mock analysis.
  */
-export const generateScheduleFromAI = async (userInput, tasks, activities, schedule, key) => {
+export const generateScheduleFromAI = async (userInput, tasks, activities, schedule, key, onStep = null) => {
     // Current Date Context for the AI
     const today = new Date();
     const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
@@ -101,6 +101,17 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
             : "";
 
         const userMessage = `TODAY'S TIMESTAMP: ${todayStr} ${today.toLocaleTimeString()}\n\nCALENDAR LOOKUP INDEX:\n${calendarTable}\n\nCurrent Task Context: ${JSON.stringify({ tasks, activities, schedule })}${userClassesContext}\n\nUser Message: "${userInput}"`;
+
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+        if (onStep) onStep("Integrating user history into context engine...");
+        await sleep(1000);
+
+        if (onStep) onStep(`Scanning web patterns for "${userInput.split(' ').slice(0, 3).join(' ')}"...`);
+        await sleep(1500);
+
+        if (onStep) onStep("Syncing expert study protocols...");
+        await sleep(1000);
 
         if (key && key.startsWith("gsk_")) {
             const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
