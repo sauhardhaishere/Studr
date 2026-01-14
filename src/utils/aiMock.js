@@ -33,7 +33,10 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         let diff = targetIdx - todayIdx;
         if (diff < 0) diff += 7;
         if (diff === 0 && !textContext.includes("today")) diff = 7;
-        if (isNext) diff += 7;
+
+        // Logical "Next" - Only skip a week if the day is in the next 2 days
+        // (e.g. on Monday, "Next Tuesday" = 8 days away, but "Next Saturday" = 5 days away)
+        if (isNext && diff <= 3) diff += 7;
         return diff;
       };
 
@@ -214,7 +217,30 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       };
 
       // --- SUBJECT DETECTION ---
-      const subjectMap = ["math", "bio", "chem", "english", "history", "physics", "spanish", "calc", "precalc", "algebra", "geometry", "stats", "science", "ap"];
+      const subjectMap = ["math", "bio", "chem", "english", "history", "physics", "spanish", "calc", "precalc", "algebra", "geometry", "stats", "science", "sat", "act", "lsat", "mcat", "ap", "latin", "french"];
+
+      const extractSubjectFromText = (text) => {
+        // 1. Look for explicit map matches
+        const mapMatch = subjectMap.find(s => text.toLowerCase().includes(s));
+        if (mapMatch) return mapMatch;
+
+        // 2. Look for "X test" or "test for X"
+        const testMatch = text.match(/(\w+)\s+(?:test|exam|quiz)/i) || text.match(/(?:test|exam|quiz)\s+(?:for|on|in)?\s+(\w+)/i);
+        if (testMatch && !["a", "the", "my", "this"].includes(testMatch[1].toLowerCase())) {
+          return testMatch[1];
+        }
+        return null;
+      };
+
+      let primarySubject = extractSubjectFromText(lastUserLower);
+
+      // Only look back if current message has NO subject but talks about a task
+      if (!primarySubject && (isTest || isAssignment)) {
+        for (let i = lines.length - 2; i >= 0; i--) {
+          const s = extractSubjectFromText(lines[i]);
+          if (s) { primarySubject = s; break; }
+        }
+      }
 
       const isAssignment = lastUserLower.includes("homework") || lastUserLower.includes("hw") || lastUserLower.includes("assignment") || lower.includes("homework") || lower.includes("hw");
       const isTest = lastUserLower.includes("test") || lastUserLower.includes("exam") || lastUserLower.includes("quiz") || lower.includes("test") || lower.includes("exam") || lower.includes("quiz");
@@ -319,17 +345,6 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       }
 
       // --- MAIN SCHEDULING (Standard Flow) ---
-      let foundSubjects = subjectMap.filter(s => lastUserLower.includes(s));
-      if (foundSubjects.length === 0) {
-        for (let i = lines.length - 1; i >= 0; i--) {
-          const lineLow = lines[i].toLowerCase();
-          const hit = subjectMap.find(s => lineLow.includes(s));
-          if (hit) { foundSubjects = [hit]; break; }
-        }
-      }
-      const uniqueSubjects = [...new Set(foundSubjects)];
-      const primarySubject = uniqueSubjects[0];
-
       const targetDeadline = parseDateFromText(lastUserLower);
       const userRawTime = parseTimeString(lastUserLower) || (lastUserLower.includes('any') ? 16 : null);
 

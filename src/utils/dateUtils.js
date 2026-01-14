@@ -28,7 +28,8 @@ export const getTaskDateValue = (task) => {
             if (dayIdx !== -1) {
                 let diff = dayIdx - now.getDay();
                 if (diff <= 0) diff += 7;
-                if (taskTime.includes('next')) {
+                // Logical "Next" - Only skip a week if the day is close
+                if (taskTime.includes('next') && diff <= 3) {
                     diff += 7;
                 }
                 const d = new Date(now);

@@ -54,8 +54,8 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - **NO BOLDING**: Do NOT use **bold** in your response messages.
 
     4. **DATE ACCURACY:**
-       - "This [Day]" (e.g. "This Tuesday") refers to the CLOSEST upcoming instance of that day.
-       - "Next [Day]" (e.g. "Next Tuesday") ALWAYS refers to the day in the FOLLOWING week. If today is Wednesday, "Next Tuesday" is the one in 13 days, not 6.
+       - "Next [Day]" (e.g. "Next Tuesday") refers to the next occurrence of that day.
+       - IMPORTANT: Only skip a week if the day is very close (e.g. today or tomorrow). If today is Wednesday, "Next Tuesday" is the upcoming Tuesday (Jan 20).
        - Verify the Month and Day match the index before outputting JSON.
 
     5. **AGENTIC PERSISTENCE & HELP:**
