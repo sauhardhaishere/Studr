@@ -113,6 +113,14 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         };
 
         const sub = extractSubject(userCleanInput) || extractSubject(lastAILower) || "General";
+        const classMatch = schedule && schedule.find(c => {
+          const name = c.name.toLowerCase();
+          const subj = (c.subject || "").toLowerCase();
+          return name.includes(sub) || subj.includes(sub);
+        });
+
+        const subName = classMatch ? classMatch.name : (sub === "General" ? "Test" : sub.toUpperCase());
+
         const isIntensitySelection = lastAILower.includes("intensity") || lastAILower.includes("normal, moderate, or hardcore");
 
         // --- INTENSITY LOGIC ---
@@ -122,18 +130,18 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           const originalDate = parseDateFromText(conversationContext) || new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
           const deadlineStr = formatDate(originalDate);
 
-          newTasks.push({ id: crypto.randomUUID(), title: `${sub.toUpperCase()} Test`, time: `${deadlineStr}, 8:00 AM`, type: "task", priority: "high" });
+          newTasks.push({ id: crypto.randomUUID(), title: `${subName} Test`, time: `${deadlineStr}, 8:00 AM`, type: "task", priority: "high" });
           for (let i = 1; i <= sessions; i++) {
             const d = new Date(originalDate);
             d.setDate(d.getDate() - i);
             if (d >= today) {
               newTasks.push({
-                id: crypto.randomUUID(), title: `${sub.toUpperCase()} Prep ${i}`, time: `${formatDate(d)}, ${getOptimalTaskTime(d)}`,
+                id: crypto.randomUUID(), title: `${subName} Prep ${i}`, time: `${formatDate(d)}, ${getOptimalTaskTime(d)}`,
                 type: "study", resources: getResources(), description: `• Focus on ${intensity} practice.`
               });
             }
           }
-          return resolve({ newTasks, message: `Got it! I've built your ${intensity} study plan for the ${sub.toUpperCase()} test.` });
+          return resolve({ newTasks, message: `Got it! I've built your ${intensity} study plan for the ${subName} test.` });
         }
 
         // --- SCHEDULING LOGIC ---
@@ -143,29 +151,29 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           const diffDays = Math.floor((date - today) / (1000 * 60 * 60 * 24));
 
           if (onStep && isHeavyTask) {
-            onStep(`Searching live web for ${sub} strategies...`);
+            onStep(`Searching live web for ${subName} strategies...`);
             await new Promise(r => setTimeout(r, 1200));
-            onStep(`Mapping ${sub} gaps in your routine...`);
+            onStep(`Mapping ${subName} gaps in your routine...`);
             await new Promise(r => setTimeout(r, 800));
           }
 
           if (diffDays > 14) {
-            return resolve({ message: `I've noted your ${sub.toUpperCase()} test for ${deadlineStr}. Would you like a Normal, Moderate, or Hardcore plan?` });
+            return resolve({ message: `I've noted your ${subName} test for ${deadlineStr}. Would you like a Normal, Moderate, or Hardcore plan?` });
           }
 
-          newTasks.push({ id: crypto.randomUUID(), title: `${sub.toUpperCase()} Test`, time: `${deadlineStr}, 8:00 AM`, type: "task", priority: "high" });
+          newTasks.push({ id: crypto.randomUUID(), title: `${subName} Test`, time: `${deadlineStr}, 8:00 AM`, type: "task", priority: "high" });
           const sessions = diffDays > 7 ? 3 : 2;
           for (let i = 1; i <= sessions; i++) {
             const d = new Date(date);
             d.setDate(d.getDate() - i);
             if (d >= today) {
               newTasks.push({
-                id: crypto.randomUUID(), title: `${sub.toUpperCase()} Review ${i}`, time: `${formatDate(d)}, ${getOptimalTaskTime(d)}`,
+                id: crypto.randomUUID(), title: `${subName} Review ${i}`, time: `${formatDate(d)}, ${getOptimalTaskTime(d)}`,
                 type: "study", resources: getResources(), description: "• Review key concepts and active recall."
               });
             }
           }
-          return resolve({ newTasks, message: `I've mapped out a study plan for your ${sub.toUpperCase()} test on ${deadlineStr}.` });
+          return resolve({ newTasks, message: `I've mapped out a study plan for your ${subName} test on ${deadlineStr}.` });
         }
 
         resolve({ newTasks: [], message: "Hey! I'm Calendly. Ready to build a high-performance study plan?" });
