@@ -33,7 +33,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         let diff = targetIdx - todayIdx;
         if (diff < 0) diff += 7;
         if (diff === 0 && !textContext.includes("today")) diff = 7;
-        if (isNext && targetIdx > todayIdx) diff += 7;
+        if (isNext) diff += 7;
         return diff;
       };
 
@@ -64,6 +64,48 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       const parseDateFromText = (text) => {
         let target = new Date(today);
         let dateFound = false;
+
+        // Try to find relative dates like "in 4 weeks" or "in 3 days"
+        const relativeMatch = text.match(/in\s+(\d+)\s+(week|day|month)s?/i);
+        if (relativeMatch) {
+          const num = parseInt(relativeMatch[1]);
+          const unit = relativeMatch[2].toLowerCase();
+          if (unit.startsWith('week')) target.setDate(today.getDate() + (num * 7));
+          else if (unit.startsWith('day')) target.setDate(today.getDate() + num);
+          else if (unit.startsWith('month')) target.setMonth(target.getMonth() + num);
+          dateFound = true;
+        }
+
+        if (!dateFound) {
+          // Try to find a numerical date like "the 27th" or "Jan 27"
+          // Also handle "on the 27" or "27th"
+          // Require either a prefix (on, the) or a suffix (st, nd, rd, th) to avoid non-date numbers
+          const numDateRegex = /(?:on\s+the\s+|on\s+|the\s+)(\d{1,2})(?:st|nd|rd|th)?|(\d{1,2})(?:st|nd|rd|th)/i;
+          const numMatch = text.match(numDateRegex);
+          const dayNum = numMatch ? parseInt(numMatch[1] || numMatch[2]) : null;
+
+          const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december", "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+          const monthFound = months.find(m => text.includes(m));
+
+          if (dayNum && !text.includes("period") && !text.includes("room") && !text.includes("every")) {
+            if (dayNum >= 1 && dayNum <= 31) {
+              if (monthFound) {
+                const monthIdx = months.indexOf(monthFound) % 12;
+                target.setMonth(monthIdx);
+              }
+              target.setDate(dayNum);
+
+              // If the date is in the past relative to today, assume next month
+              if (target < today && !monthFound) {
+                target.setMonth(target.getMonth() + 1);
+              }
+              dateFound = true;
+            }
+          }
+        }
+
+        if (dateFound) return target;
+
         if (text.includes("tomorrow")) { target.setDate(today.getDate() + 1); dateFound = true; }
         else if (text.includes("today")) { dateFound = true; }
         else {
@@ -93,14 +135,16 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
         // Existing tasks on this day
         const dayTasks = allExistingTasks.filter(t => t.time.includes(dStr)).map(t => {
-          const startTime = parseTimeString(t.time.split(',')[1]);
+          const startTimeStr = t.time.includes(',') ? t.time.split(',')[1] : (t.time.includes(' at ') ? t.time.split(' at ')[1] : t.time);
+          const startTime = parseTimeString(startTimeStr);
           const duration = t.duration ? (t.duration.includes('h') ? parseInt(t.duration) : parseInt(t.duration) / 60) : 1;
           return { start: startTime, end: startTime + duration };
         });
 
         // Current AI plan tasks (prevent self-overlap)
         newTasks.filter(t => t.time.includes(dStr)).forEach(t => {
-          const startTime = parseTimeString(t.time.split(',')[1]);
+          const startTimeStr = t.time.includes(',') ? t.time.split(',')[1] : t.time;
+          const startTime = parseTimeString(startTimeStr);
           dayTasks.push({ start: startTime, end: startTime + 1 });
         });
 
@@ -117,10 +161,18 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           if (!isTaken) return formatTimeFromDecimal(preferenceHour);
         }
 
+        // Try to find a gap in the free slot
         for (let t = blockStart; t <= blockEnd - durationHours; t += 0.5) {
           const isTaken = dayTasks.some(task => (t >= task.start && t < task.end) || (t + durationHours > task.start && t + durationHours <= task.end));
           if (!isTaken) return formatTimeFromDecimal(t);
         }
+
+        // If no gap in free slot, try anywhere between 3 PM and 9 PM as fallback
+        for (let t = 15; t <= 21 - durationHours; t += 0.5) {
+          const isTaken = dayTasks.some(task => (t >= task.start && t < task.end) || (t + durationHours > task.start && t + durationHours <= task.end));
+          if (!isTaken) return formatTimeFromDecimal(t);
+        }
+
         return null;
       };
 
@@ -172,6 +224,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       // --- AGENTIC MEMORY: CLASS CREATION & AUTO-SCHEDULE ---
       const isAnsweringClassName = lastAILower.includes('full name of that class') || lastAILower.includes("full name of your");
       const isNegotiatingTime = lastAILower.includes('conflict') || lastAILower.includes('what time works');
+      const isIntensityRequest = lastAILower.includes('intensity') || lastAILower.includes('study mode');
 
       if (isAnsweringClassName && lastUserMsg.length > 1 && !currentMsgIsTask) {
         // Auto Correct The Name
@@ -189,49 +242,75 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         const newClass = { id: crypto.randomUUID(), name: correctedName, subject: subCategory };
         newClasses.push(newClass);
 
-        // 3. IMMEDIATELY Schedule the Tasks
+        // 3. Check if we need intensity
+        const diffDays = Math.floor((originalDate - today) / (1000 * 60 * 60 * 24));
+        if (diffDays > 14) {
+          return resolve({ newClasses, message: `Perfect! I've added **${correctedName}** to your schedule. Since this test is over 2 weeks away, what study intensity do you prefer: **Normal**, **Moderate**, or **Hardcore**?` });
+        }
+
+        // 4. IMMEDIATELY Schedule the Tasks
         const subName = correctedName;
         const deadlineStr = formatDate(originalDate);
 
-        const origIsTest = originalLower.includes('test') || originalLower.includes('exam');
-        const origIsHW = originalLower.includes('homework') || originalLower.includes('hw');
+        newTasks.push({
+          id: crypto.randomUUID(), title: `${subName} Test`, time: `${deadlineStr}, 8:00 AM`,
+          type: "task", priority: "high", description: `• Exam day for ${subName}.`
+        });
 
-        if (origIsTest || !origIsHW) {
-          newTasks.push({
-            id: crypto.randomUUID(), title: `${subName} Test`, time: `${deadlineStr}, 8:00 AM`,
-            type: "task", priority: "high", description: `• Exam day for ${subName}.`
-          });
-          for (let i = 1; i <= 2; i++) {
-            const d = new Date(originalDate); d.setDate(d.getDate() - i);
-            if (d >= today) {
-              const bestTime = getOptimalTaskTime(d, 1);
-              if (bestTime) {
-                newTasks.push({
-                  id: crypto.randomUUID(), title: `${subName} ${i === 1 ? 'Review' : 'Prep'}`, time: `${formatDate(d)}, ${bestTime}`,
-                  duration: "1h", type: "study", priority: "medium",
-                  description: getStudyAdvice(subName, i === 1 ? 'final' : 'prep'),
-                  resources: getResources(true)
-                });
-              }
+        const sessions = diffDays > 7 ? 4 : 2;
+        for (let i = 1; i <= sessions; i++) {
+          const d = new Date(originalDate); d.setDate(d.getDate() - (i * Math.floor(diffDays / sessions) || 1));
+          if (d >= today) {
+            const bestTime = getOptimalTaskTime(d, 1);
+            if (bestTime) {
+              newTasks.push({
+                id: crypto.randomUUID(), title: `${subName} ${i === 1 ? 'Review' : 'Prep'}`, time: `${formatDate(d)}, ${bestTime}`,
+                duration: "1h", type: "study", priority: "medium",
+                description: getStudyAdvice(subName, i === 1 ? 'final' : 'prep'),
+                resources: getResources(true)
+              });
             }
-          }
-        } else {
-          const bestTime = getOptimalTaskTime(originalDate, 1);
-          if (bestTime) {
-            newTasks.push({
-              id: crypto.randomUUID(), title: `${subName} Work`, time: `${deadlineStr}, ${bestTime}`,
-              duration: "45m", type: "study", priority: "medium",
-              description: `• Complete assignment for ${subName}.`,
-              resources: getResources(false)
-            });
           }
         }
 
         return resolve({
           newTasks,
           newClasses,
-          message: `Perfect! I've added **${subName}** to your schedule (Subject: ${subCategory}) and mapped out your study plan for ${deadlineStr}.`
+          message: `Perfect! I've added **${subName}** to your schedule and mapped out a ${sessions}-day study plan for ${deadlineStr}.`
         });
+      }
+
+      // Handle Intensity Response
+      if (isIntensityRequest) {
+        const intensity = lastUserLower.includes('hard') ? 'Hardcore' : (lastUserLower.includes('mod') ? 'Moderate' : 'Normal');
+        const originalRequest = lines.find(l => l.toLowerCase().includes('test')) || "";
+        const originalDate = parseDateFromText(originalRequest.toLowerCase()) || new Date(today.getTime() + 21 * 24 * 60 * 60 * 1000);
+        const subName = correctTypos(originalRequest.split(' ')[0] || "Test");
+        const deadlineStr = formatDate(originalDate);
+
+        const sessions = intensity === 'Hardcore' ? 8 : (intensity === 'Moderate' ? 5 : 3);
+
+        newTasks.push({
+          id: crypto.randomUUID(), title: `${subName} Test`, time: `${deadlineStr}, 8:00 AM`,
+          type: "task", priority: "high", description: `• Exam day for ${subName}.`
+        });
+
+        const diffDays = Math.floor((originalDate - today) / (1000 * 60 * 60 * 24));
+        for (let i = 1; i <= sessions; i++) {
+          const d = new Date(originalDate); d.setDate(d.getDate() - Math.floor(i * (diffDays / (sessions + 1))));
+          if (d >= today) {
+            const bestTime = getOptimalTaskTime(d, 1);
+            if (bestTime) {
+              newTasks.push({
+                id: crypto.randomUUID(), title: `${subName} Study Session ${i}`, time: `${formatDate(d)}, ${bestTime}`,
+                duration: intensity === 'Hardcore' ? "2h" : "1h", type: "study", priority: "medium",
+                description: `• ${intensity} session. Focus on active recall and practice problems.`,
+                resources: getResources(true)
+              });
+            }
+          }
+        }
+        return resolve({ newTasks, message: `Got it! I've mapped out a **${intensity}** study plan with ${sessions} sessions leading up to your test on ${deadlineStr}.` });
       }
 
       // --- MAIN SCHEDULING (Standard Flow) ---
@@ -246,8 +325,8 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       const uniqueSubjects = [...new Set(foundSubjects)];
       const primarySubject = uniqueSubjects[0];
 
-      const targetDeadline = parseDateFromText(lastUserLower) || new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
-      const userRawTime = parseTimeString(lastUserLower);
+      const targetDeadline = parseDateFromText(lastUserLower);
+      const userRawTime = parseTimeString(lastUserLower) || (lastUserLower.includes('any') ? 16 : null);
 
       // Check for class matching subject
       const classRes = schedule && schedule.find(c => primarySubject && (c.name.toLowerCase().includes(primarySubject) || (c.subject && c.subject.toLowerCase().includes(primarySubject))));
@@ -258,14 +337,14 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
       // Conflict Negotiation Response
       if (isNegotiatingTime && userRawTime !== null) {
-        const testMatch = lower.match(/(\w+)\s+test/);
-        const confirmedSub = testMatch ? testMatch[1] : (classRes ? classRes.name : "Class");
-        const conflictDate = parseDateFromText(lower) || targetDeadline;
+        const testRequest = lines.find(l => l.toLowerCase().includes('test')) || "";
+        const confirmedSub = classRes ? classRes.name : (primarySubject ? primarySubject.charAt(0).toUpperCase() + primarySubject.slice(1) : "Test");
+        const conflictDate = parseDateFromText(lastAILower) || targetDeadline || new Date();
 
         const reviewTime = formatTimeFromDecimal(userRawTime);
 
         newTasks.push({
-          id: crypto.randomUUID(), title: `${confirmedSub} Test`, time: `${formatDate(new Date(conflictDate.getTime() + 86400000))}, 8:00 AM`,
+          id: crypto.randomUUID(), title: `${confirmedSub} Test`, time: `${formatDate(targetDeadline || conflictDate)}, 8:00 AM`,
           type: "task", priority: "high", description: `• Exam day.`
         });
         newTasks.push({
@@ -280,8 +359,14 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
       const subName = classRes ? classRes.name : (primarySubject ? primarySubject.charAt(0).toUpperCase() + primarySubject.slice(1) : "General");
 
-      if (hasTaskMention) {
+      if (hasTaskMention && targetDeadline) {
         const deadlineStr = formatDate(targetDeadline);
+        const diffDays = Math.floor((targetDeadline - today) / (1000 * 60 * 60 * 24));
+
+        if (diffDays > 14) {
+          return resolve({ newTasks: [], message: `I've noted your ${subName} test for ${deadlineStr}. Since it's quite a bit away, would you like a **Normal**, **Moderate**, or **Hardcore** study plan?` });
+        }
+
         let missingSpotDay = null;
 
         if (isTest) {
@@ -290,8 +375,9 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
             type: "task", priority: "high", description: `• Exam day for ${subName}.`
           });
 
-          for (let i = 1; i <= 2; i++) {
-            const d = new Date(targetDeadline); d.setDate(d.getDate() - i);
+          const sessions = diffDays > 7 ? 4 : 2;
+          for (let i = 1; i <= sessions; i++) {
+            const d = new Date(targetDeadline); d.setDate(d.getDate() - (i * Math.floor(diffDays / sessions) || 1));
             if (d >= today) {
               const bestTime = getOptimalTaskTime(d, 1);
               if (!bestTime) { missingSpotDay = getDayNameFromDate(d); break; }
@@ -307,12 +393,16 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           if (missingSpotDay) {
             return resolve({
               newTasks: [],
-              message: `I noticed a conflict on ${missingSpotDay}—I couldn't find a free gap in your routine. What time works best for you to study for ${subName} that day?`
+              message: `I noticed a conflict on ${missingSpotDay}—I couldn't find a free gap in your routine. What time works best for you to study for ${subName} that day? (You can say 'any' to pick 4 PM)`
             });
           }
 
           return resolve({ newTasks, message: `Got it! I've automatically found gaps in your free time and mapped out a specific study plan for your ${subName} test on ${deadlineStr}.` });
         }
+      }
+
+      if (lastUserLower.includes("help") || lastUserLower.includes("what can you do")) {
+        return resolve({ newTasks: [], message: "I'm here to help you dominate your classes! You can tell me about upcoming tests or homework, ask to add a new class, or update your routine blocks in the Schedule tab." });
       }
 
       resolve({ newTasks: [], message: "Hey! I'm Calendly. Ready to build a high-performance study plan?" });

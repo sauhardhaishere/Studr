@@ -167,7 +167,7 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities, onDele
                     const formatTime = (totalMin) => {
                         let h = Math.floor(totalMin / 60);
                         const m = totalMin % 60;
-                        const ampm = h >= 12 ? 'PM' : 'AM';
+                        const ampm = (h >= 12 && h < 24) ? 'PM' : 'AM';
                         h = h % 12 || 12;
                         return `${h}:${m.toString().padStart(2, '0')} ${ampm}`;
                     };
@@ -197,7 +197,7 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities, onDele
                     let coveredMinutes = 0;
 
                     segments.forEach((seg, idx) => {
-                        if (seg.startMin > lastEnd) {
+                        if (seg.startMin > lastEnd + 1) { // Only show gaps > 1 minute
                             timelineItems.push({
                                 type: 'gap',
                                 time: `${formatTime(lastEnd)} - ${formatTime(seg.startMin)}`,
@@ -218,10 +218,10 @@ const ScheduleView = ({ schedule, setSchedule, activities, setActivities, onDele
                         }
                     });
 
-                    if (lastEnd < 1440) {
+                    if (1440 - lastEnd > 1) { // Only show if more than 1 minute remains
                         timelineItems.push({
                             type: 'gap',
-                            time: `${formatTime(lastEnd)} - 11:59 PM`,
+                            time: `${formatTime(lastEnd)} - 12:00 AM`,
                             startMin: lastEnd,
                             endMin: 1440,
                             id: `gap-end`
