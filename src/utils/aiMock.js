@@ -161,19 +161,22 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
         if (preferenceHour !== null) {
           const isTaken = dayTasks.some(t => (preferenceHour >= t.start && preferenceHour < t.end) || (preferenceHour + durationHours > t.start && preferenceHour + durationHours <= t.end));
-          if (!isTaken) return formatTimeFromDecimal(preferenceHour);
+          const isInPastToday = dStr === formatDate(today) && preferenceHour <= (today.getHours() + today.getMinutes() / 60);
+          if (!isTaken && !isInPastToday) return formatTimeFromDecimal(preferenceHour);
         }
 
         // Try to find a gap in the free slot
         for (let t = blockStart; t <= blockEnd - durationHours; t += 0.5) {
           const isTaken = dayTasks.some(task => (t >= task.start && t < task.end) || (t + durationHours > task.start && t + durationHours <= task.end));
-          if (!isTaken) return formatTimeFromDecimal(t);
+          const isInPastToday = dStr === formatDate(today) && t <= (today.getHours() + today.getMinutes() / 60);
+          if (!isTaken && !isInPastToday) return formatTimeFromDecimal(t);
         }
 
         // If no gap in free slot, try anywhere between 3 PM and 9 PM as fallback
         for (let t = 15; t <= 21 - durationHours; t += 0.5) {
           const isTaken = dayTasks.some(task => (t >= task.start && t < task.end) || (t + durationHours > task.start && t + durationHours <= task.end));
-          if (!isTaken) return formatTimeFromDecimal(t);
+          const isInPastToday = dStr === formatDate(today) && t <= (today.getHours() + today.getMinutes() / 60);
+          if (!isTaken && !isInPastToday) return formatTimeFromDecimal(t);
         }
 
         return null;
@@ -290,12 +293,17 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
         const sessions = diffDays > 7 ? 4 : 2;
         for (let i = 1; i <= sessions; i++) {
-          const d = new Date(originalDate); d.setDate(d.getDate() - (i * Math.floor(diffDays / sessions) || 1));
-          if (d >= today) {
+          const d = new Date(originalDate);
+          // Phase 1 (Final Review) is ALWAYS 1 day before the test
+          // Subsequent sessions (i > 1) are spread out
+          const offset = (i === 1) ? 1 : Math.round((i - 1) * (diffDays / sessions));
+          d.setDate(d.getDate() - offset);
+
+          if (d.getTime() >= today.getTime() - 86400000) { // Allowed if it's today or later
             const bestTime = getOptimalTaskTime(d, 1);
             if (bestTime) {
               newTasks.push({
-                id: crypto.randomUUID(), title: `${subName} ${i === 1 ? 'Review' : 'Prep'}`, time: `${formatDate(d)}, ${bestTime}`,
+                id: crypto.randomUUID(), title: `${subName} ${i === 1 ? 'Final Review' : 'Prep'}`, time: `${formatDate(d)}, ${bestTime}`,
                 duration: "1h", type: "study", priority: "medium",
                 description: getStudyAdvice(subName, i === 1 ? 'final' : 'prep'),
                 resources: getResources(true)
@@ -314,9 +322,11 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       // Handle Intensity Response
       if (isIntensityRequest) {
         const intensity = lastUserLower.includes('hard') ? 'Hardcore' : (lastUserLower.includes('mod') ? 'Moderate' : 'Normal');
-        const originalRequest = lines.find(l => l.toLowerCase().includes('test')) || "";
-        const originalDate = parseDateFromText(originalRequest.toLowerCase()) || new Date(today.getTime() + 21 * 24 * 60 * 60 * 1000);
-        const subName = correctTypos(originalRequest.split(' ')[0] || "Test");
+        const originalRequestLine = lines.find(l => l.toLowerCase().includes('test')) || "";
+        const subFromRequest = extractSubjectFromText(originalRequestLine) || "Test";
+        const subName = correctTypos(subFromRequest);
+
+        const originalDate = parseDateFromText(originalRequestLine.toLowerCase()) || new Date(today.getTime() + 21 * 24 * 60 * 60 * 1000);
         const deadlineStr = formatDate(originalDate);
 
         const sessions = intensity === 'Hardcore' ? 8 : (intensity === 'Moderate' ? 5 : 3);
@@ -328,14 +338,18 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
         const diffDays = Math.floor((originalDate - today) / (1000 * 60 * 60 * 24));
         for (let i = 1; i <= sessions; i++) {
-          const d = new Date(originalDate); d.setDate(d.getDate() - Math.floor(i * (diffDays / (sessions + 1))));
-          if (d >= today) {
+          const d = new Date(originalDate);
+          // Final Review is 1 day before, others spread out
+          const offset = (i === 1) ? 1 : Math.round((i - 1) * (diffDays / (sessions / 2 + 1)));
+          d.setDate(d.getDate() - offset);
+
+          if (d.getTime() >= today.getTime() - 86400000) {
             const bestTime = getOptimalTaskTime(d, 1);
             if (bestTime) {
               newTasks.push({
                 id: crypto.randomUUID(), title: `${subName} Study Session ${i}`, time: `${formatDate(d)}, ${bestTime}`,
                 duration: intensity === 'Hardcore' ? "2h" : "1h", type: "study", priority: "medium",
-                description: `• ${intensity} session. Focus on active recall and practice problems.`,
+                description: `• ${intensity} session. ${i === 1 ? 'Final review and active recall.' : 'Focus on practice problems and key concepts.'}`,
                 resources: getResources(true)
               });
             }
