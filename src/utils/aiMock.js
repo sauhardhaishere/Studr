@@ -203,6 +203,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
       // AUTO CORRECT HELPER
       const correctTypos = (text) => {
+        if (!text) return text;
         const corrections = {
           "calclus": "Calculus", "calc": "Calculus", "calculs": "Calculus",
           "chemestry": "Chemistry", "biolgy": "Biology", "histroy": "History",
@@ -337,6 +338,9 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         });
 
         const diffDays = Math.floor((originalDate - today) / (1000 * 60 * 60 * 24));
+        const { getStrategyForSubject } = await import('./studyStrategies');
+        const strategy = getStrategyForSubject(subName);
+
         for (let i = 1; i <= sessions; i++) {
           const d = new Date(originalDate);
           // Final Review is 1 day before, others spread out
@@ -349,13 +353,13 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
               newTasks.push({
                 id: crypto.randomUUID(), title: `${subName} Study Session ${i}`, time: `${formatDate(d)}, ${bestTime}`,
                 duration: intensity === 'Hardcore' ? "2h" : "1h", type: "study", priority: "medium",
-                description: `• ${intensity} session. ${i === 1 ? 'Final review and active recall.' : 'Focus on practice problems and key concepts.'}`,
-                resources: getResources(true)
+                description: i === 1 ? `• Final review and active recall.\n${strategy.advice}` : `• ${intensity} session. Focus on practice problems.\n${strategy.advice.split('\n')[0]}`,
+                resources: strategy.resources
               });
             }
           }
         }
-        return resolve({ newTasks, message: `Got it! I've mapped out a ${intensity} study plan with ${sessions} sessions leading up to your test on ${deadlineStr}.` });
+        return resolve({ newTasks, message: `Got it! I've searched for the best ${subName} strategies and mapped out a ${intensity} study plan with ${sessions} sessions leading up to your test on ${deadlineStr}.` });
       }
 
       // --- MAIN SCHEDULING (Standard Flow) ---

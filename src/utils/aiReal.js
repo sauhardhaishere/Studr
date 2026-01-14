@@ -36,17 +36,18 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - **SCALING**: 
          - If Test is < 1 week away: 2 sessions.
          - If Test is 1-2 weeks away: 4 sessions.
-         - If Test is > 2 weeks away: Stop and ask for **INTENSITY LEVEL**: "I've noted your [Subject] test! Since it's quite a bit away, would you like a **Normal**, **Moderate**, or **Hardcore** study plan?"
-       - **INTENSITY LEVELS**:
-         - **Normal**: 3 sessions (1h each).
-         - **Moderate**: 5 sessions (1.5h each).
-         - **Hardcore**: 8 sessions (2h each).
+         - If Test is > 2 weeks away: Stop and ask for **INTENSITY LEVEL**: "I've noted your [Subject] test! Since it's quite a bit away, would you like a Normal, Moderate, or Hardcore study plan?"
+       - **TIMING**: Always place the 'Final Review' session EXACTLY 1 day before the test. Space other sessions out leading up to it.
+       - **EXPERT STRATEGIES**:
+         - **SAT**: Mention "Digital Adaptive Strategy", "Module 1 performance", and "Desmos Calculator".
+         - **ACT**: Mention "Non-adaptive format", "4 math choices", and "Optional Science focus".
        - **RESOURCES**: Include: 
          - {"label": "Study Coach (AI)", "url": "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n"}
-         - {"label": "Knowt", "url": "https://knowt.com"}
-         - {"label": "Quizlet", "url": "https://quizlet.com"}
+         - {"label": "Khan Academy (SAT)", "url": "https://www.khanacademy.org/test-prep/sat"}
+         - {"label": "ACT Academy", "url": "https://www.act.org/content/act/en/products-and-services/the-act/test-preparation/act-academy.html"}
 
     3. **SMART GAP-FINDING & DURATION MATH:**
+       - **NO PAST SCHEDULING**: If scheduling for TODAY, never pick a time in the past.
        - **DURATION AWARENESS**: Check 'tasks' start/end times.
        - **ROUTINE RANGE**: Use 'isFreeSlot' activities first.
        - **CONFLICT RESOLUTION**: If no gap exists in free slots, ask for a time. 
