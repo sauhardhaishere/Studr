@@ -60,11 +60,20 @@ export const categorizeTask = (task) => {
     const now = new Date(); // FULL current time including hours/minutes
 
     const diffMs = taskDateValue - now.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    // Use a small buffer (e.g., 5 mins) or just straight comparison
+    // Use a small buffer (e.g., 5 mins)
     if (diffMs < -300000) return 'overdue'; // Overdue if more than 5 mins in the past
-    if (diffDays === 0) return 'today';
-    if (diffDays > 0 && diffDays <= 7) return 'thisWeek';
-    if (diffDays > 7 && diffDays <= 14) return 'nextWeek';
+
+    // Normalize dates for day categorization
+    const taskDate = new Date(taskDateValue);
+    taskDate.setHours(0, 0, 0, 0);
+    const todayDate = new Date(now);
+    todayDate.setHours(0, 0, 0, 0);
+    const dayDiff = Math.round((taskDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (dayDiff === 0) return 'today';
+    if (dayDiff > 0 && dayDiff <= 7) return 'thisWeek';
+    if (dayDiff > 7 && dayDiff <= 14) return 'nextWeek';
     return 'later';
 };

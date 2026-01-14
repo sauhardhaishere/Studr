@@ -37,6 +37,7 @@ const ChevronRight = () => (
 
 function App() {
   const [session, setSession] = useState(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [view, setView] = useState('home');
   const [showTutorial, setShowTutorial] = useState(false);
 
@@ -47,6 +48,7 @@ function App() {
         const hasSeen = localStorage.getItem(`hasSeenTutorial_${session.user.id}`);
         if (!hasSeen) setShowTutorial(true);
       }
+      setIsLoadingAuth(false);
     });
 
     const {
@@ -57,6 +59,7 @@ function App() {
         const hasSeen = localStorage.getItem(`hasSeenTutorial_${session.user.id}`);
         if (!hasSeen) setShowTutorial(true);
       }
+      setIsLoadingAuth(false);
     });
 
     return () => subscription.unsubscribe();
@@ -418,6 +421,22 @@ function App() {
     }
     setShowTutorial(false);
   };
+
+  if (isLoadingAuth) {
+    return (
+      <div style={{
+        height: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#0a0a0a',
+        color: '#fff',
+        fontFamily: 'Inter, sans-serif'
+      }}>
+        <div className="loading-spinner"></div>
+      </div>
+    );
+  }
 
   if (!session) {
     return <Auth />;
