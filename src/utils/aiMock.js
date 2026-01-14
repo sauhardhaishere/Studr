@@ -33,7 +33,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         let diff = targetIdx - todayIdx;
         if (diff < 0) diff += 7;
         if (diff === 0 && !textContext.includes("today")) diff = 7;
-        if (isNext) diff += 7;
+        if (isNext && targetIdx > todayIdx) diff += 7;
         return diff;
       };
 

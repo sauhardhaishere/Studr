@@ -48,7 +48,8 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - **CONFLICT RESOLUTION**: If no gap exists, ask for a time. Once the user provides a time, IMMEDIATELY fulfill the original scheduling request and stop asking.
 
     4. **DATE ACCURACY:**
-       - "This [Day]" (e.g., "This Wednesday") ALWAYS refers to the next coming instance of that day in the lookup index.
+       - "This [Day]" OR "Next [Day]" (e.g. "Next Tuesday") ALWAYS refers to the CLOSEST upcoming instance of that day in the lookup index.
+       - Do NOT skip a week. "Next Tuesday" means the very next Tuesday that appears in the calendar table.
        - Verify the Month and Day match the index before outputting JSON.
 
     5. **AGENTIC PERSISTENCE & CLOSING THE LOOP:**

@@ -28,7 +28,7 @@ export const getTaskDateValue = (task) => {
             if (dayIdx !== -1) {
                 let diff = dayIdx - now.getDay();
                 if (diff <= 0) diff += 7;
-                if (taskTime.includes('next')) {
+                if (taskTime.includes('next') && dayIdx > now.getDay()) {
                     if (diff < 7) diff += 7;
                 }
                 const d = new Date(now);
