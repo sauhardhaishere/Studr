@@ -221,7 +221,8 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       };
 
       // --- SUBJECT DETECTION ---
-      const subjectMap = ["math", "bio", "chem", "english", "history", "physics", "spanish", "calc", "precalc", "algebra", "geometry", "stats", "science", "sat", "act", "lsat", "mcat", "ap", "latin", "french"];
+      const subjectMap = ["math", "bio", "chem", "english", "history", "physics", "spanish", "calc", "precalc", "algebra", "geometry", "stats", "science", "sat", "act", "lsat", "mcat", "ap", "latin", "french", "gaokao", "ielts", "toefl", "gre", "gmat"];
+      const globalExams = ["sat", "act", "lsat", "mcat", "gaokao", "ielts", "toefl", "gre", "gmat"];
 
       const extractSubjectFromText = (text) => {
         // 1. Look for explicit map matches
@@ -368,8 +369,9 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
       // Check for class matching subject
       const classRes = schedule && schedule.find(c => primarySubject && (c.name.toLowerCase().includes(primarySubject) || (c.subject && c.subject.toLowerCase().includes(primarySubject))));
+      const isGlobalExam = primarySubject && globalExams.includes(primarySubject.toLowerCase());
 
-      if (hasTaskMention && !classRes && !isNegotiatingTime) {
+      if (hasTaskMention && !classRes && !isNegotiatingTime && !isGlobalExam) {
         return resolve({ newTasks: [], message: `I see you have a ${primarySubject || 'class'} test coming up! What's the full name of that class in your schedule?` });
       }
 

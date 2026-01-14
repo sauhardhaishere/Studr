@@ -19,6 +19,13 @@ export const testStrategies = {
             { label: "Knowt", url: "https://knowt.com" },
             { label: "Quizlet", url: "https://quizlet.com" }
         ]
+    },
+    gaokao: {
+        advice: "• Marathon Strategy: Gaokao is an endurance test. Focus on mastering the syllabus early and participate in every simulated 'mock' exam.\n• Math/Physics: Prioritize problem-solving logic over rote memorization. Practice complex multi-step problems daily.\n• Chinese/English: Focus on high-scoring essay techniques and reading comprehension speed.\n• Healthy Balance: Maintain 12-hour study cycles but prioritize sleep and mental resilience to avoid burnout.",
+        resources: [
+            { label: "Gaokao Master Class", url: "https://www.china.org.cn/china/Gaokao/node_7184239.htm" },
+            { label: "Practice Papers Hub", url: "https://en.wikipedia.org/wiki/Gaokao" }
+        ]
     }
 };
 
@@ -26,5 +33,6 @@ export const getStrategyForSubject = (subject) => {
     const s = subject.toLowerCase();
     if (s.includes('sat')) return testStrategies.sat;
     if (s.includes('act')) return testStrategies.act;
+    if (s.includes('gaokao')) return testStrategies.gaokao;
     return testStrategies.general;
 };

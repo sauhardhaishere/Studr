@@ -1,4 +1,5 @@
 import { simulateAIAnalysis } from "./aiMock";
+import { searchWebForStrategy } from "../services/searchService";
 
 /**
  * Generates a structured schedule using AI (Groq, OpenAI, or Gemini).
@@ -23,11 +24,17 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
     
     CRITICAL: YOU MUST OPERATE USING THE INDEX SYSTEM BELOW. DO NOT USE YOUR OWN CALENDAR LOGIC.
     
+    13. **WEB SEARCH INTEGRATION**:
+        - If 'WEB SEARCH CONTEXT (LIVE)' is provided, you MUST use that information as your primary source of study strategies and resources.
+        - Mention that you searched the web to find this plan.
+    
     CALENDAR LOOKUP INDEX:
     ${calendarTable}
     
     1. **CLASS VERIFICATION & AGENTIC CREATION:**
-       - **VERIFICATION**: If a subject is mentioned but not in 'User's Classes', you MUST stop and ask: "I see you have a Spanish test! What's the full name of that class in your schedule?"
+       - **VERIFICATION**: If a subject is mentioned but not in 'User's Classes', check if it is a **Standardized/Global Test** (e.g. SAT, ACT, Gaokao, IELTS, TOEFL, GRE, LSAT, MCAT). 
+       - **BYPASS**: If it IS a global test, do NOT ask for a class name. Create it directly.
+       - **PROMPT**: If it is a normal school subject (Spanish, Math, etc.) and missing, ask: "I see you have a Spanish test! What's the full name of that class in your schedule?"
        - **HANDLING REPLIES**: If the user provides a name, **AUTOCORRECT TYPOS** (e.g. "Calclus" -> "Calculus") before creating it.
        - **IMMEDIATE ACTION**: After creating the class, IMMEDIATELY schedule the original request.
 
@@ -41,6 +48,7 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - **EXPERT STRATEGIES**:
          - **SAT**: Mention "Digital Adaptive Strategy", "Module 1 performance", and "Desmos Calculator".
          - **ACT**: Mention "Non-adaptive format", "4 math choices", and "Optional Science focus".
+         - **GAOKAO**: Mention "12-hour study cycles", "Simulated mock exams", and "Endurance/resilience".
        - **RESOURCES**: Include: 
          - {"label": "Study Coach (AI)", "url": "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n"}
          - {"label": "Khan Academy (SAT)", "url": "https://www.khanacademy.org/test-prep/sat"}
@@ -100,18 +108,29 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
             ? `\n\nUser's Classes:\n${schedule.map(c => `- ${c.name} (${c.subject})`).join('\n')}`
             : "";
 
-        const userMessage = `TODAY'S TIMESTAMP: ${todayStr} ${today.toLocaleTimeString()}\n\nCALENDAR LOOKUP INDEX:\n${calendarTable}\n\nCurrent Task Context: ${JSON.stringify({ tasks, activities, schedule })}${userClassesContext}\n\nUser Message: "${userInput}"`;
-
-        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
         if (onStep) onStep("Integrating user history into context engine...");
         await sleep(1000);
 
-        if (onStep) onStep(`Scanning web patterns for "${userInput.split(' ').slice(0, 3).join(' ')}"...`);
-        await sleep(1500);
+        // --- WEB SEARCH ENGINE ---
+        let webContext = "";
+        let searchResults = null;
 
-        if (onStep) onStep("Syncing expert study protocols...");
-        await sleep(1000);
+        // Extract a probable subject for searching
+        const probableSubject = userInput.match(/(?:test|exam|quiz|for)\s+([a-zA-Z0-9\s]{2,20})/i)?.[1] || userInput.split(' ').slice(0, 3).join(' ');
+
+        if (onStep) onStep(`Searching the live web for "${probableSubject}" study strategies...`);
+        searchResults = await searchWebForStrategy(probableSubject);
+
+        if (searchResults && searchResults.answer) {
+            if (onStep) onStep(`Analyzing real-time search results for ${probableSubject}...`);
+            webContext = `\n\nWEB SEARCH CONTEXT (LIVE):\n${searchResults.answer}\n\nTop Resources Found:\n${JSON.stringify(searchResults.results)}`;
+            await sleep(1000);
+        } else {
+            if (onStep) onStep("Using internal high-performance protocols...");
+            await sleep(1000);
+        }
+
+        const userMessage = `TODAY'S TIMESTAMP: ${todayStr} ${today.toLocaleTimeString()}\n\nCALENDAR LOOKUP INDEX:\n${calendarTable}\n\nCurrent Task Context: ${JSON.stringify({ tasks, activities, schedule })}${userClassesContext}${webContext}\n\nUser Message: "${userInput}"`;
 
         if (key && key.startsWith("gsk_")) {
             const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
