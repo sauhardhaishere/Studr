@@ -73,7 +73,13 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
             ? `\n\nUser's Classes:\n${schedule.map(c => `- ${c.name} (${c.subject})`).join('\n')}`
             : "";
 
-        const isSearchNeeded = userInput.toLowerCase().includes("test") || userInput.toLowerCase().includes("exam") || userInput.toLowerCase().includes("gaokao") || userInput.toLowerCase().includes("sat") || userInput.toLowerCase().includes("act");
+        const lowerInput = userInput.toLowerCase();
+        const commonSubjects = ["math", "science", "history", "english", "spanish", "physics", "bio", "chem", "biology", "chemistry", "algebra", "geometry", "calc", "calculus", "stats"];
+        const isCommonSubject = commonSubjects.some(s => lowerInput.includes(s));
+        const isStandardized = lowerInput.includes("gaokao") || lowerInput.includes("sat") || lowerInput.includes("act") || lowerInput.includes("ap") || lowerInput.includes("lsat") || lowerInput.includes("mcat");
+
+        // ONLY search the web if it's a standardized test (not for basic school subjects)
+        const isSearchNeeded = isStandardized && !isCommonSubject;
 
         if (onStep && isSearchNeeded) {
             onStep("Connecting to global academic database...");
