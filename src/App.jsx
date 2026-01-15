@@ -239,10 +239,11 @@ function App() {
 
   const toggleListening = () => {
     if (isListening) {
+      setIsListening(false);
       if (recognitionRef.current) {
+        recognitionRef.current.onend = null; // Prevent restart
         recognitionRef.current.stop();
       }
-      setIsListening(false);
       return;
     }
 
@@ -252,52 +253,54 @@ function App() {
       return;
     }
 
-    try {
+    const startRecognition = () => {
       const recognition = new SpeechRecognition();
       recognition.lang = 'en-US';
       recognition.interimResults = true;
-      recognition.continuous = true;
+      recognition.continuous = false; // False is more reliable on many systems; we'll auto-restart
 
       recognition.onstart = () => {
         setIsListening(true);
-        console.log("Speech recognition started");
+        console.log("Mic Live");
       };
 
       recognition.onresult = (event) => {
-        let finalTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          }
+        let transcript = "";
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
         }
-
-        // Use interim results for immediate feedback
-        const currentTranscript = Array.from(event.results)
-          .map(result => result[0].transcript)
-          .join('');
-
-        setInput(currentTranscript);
+        console.log("Transcript:", transcript);
+        setInput(transcript);
       };
 
       recognition.onerror = (event) => {
-        console.error("Speech Recognition Error:", event.error);
-        if (event.error === 'not-allowed') {
-          alert("Microphone access denied. Please enable it in your browser settings.");
+        console.error("Mic Error:", event.error);
+        if (event.error === 'no-speech') {
+          // Restart if it's just a silence timeout
+          if (isListening) recognition.start();
+        } else {
+          setIsListening(false);
         }
-        setIsListening(false);
       };
 
       recognition.onend = () => {
-        console.log("Speech recognition ended");
-        setIsListening(false);
+        // If the user hasn't clicked stop, restart for continuous feeling
+        if (isListening) {
+          try {
+            recognition.start();
+          } catch (e) {
+            console.warn("Recognition restart swallowed:", e);
+          }
+        } else {
+          setIsListening(false);
+        }
       };
 
-      recognition.start();
       recognitionRef.current = recognition;
-    } catch (e) {
-      console.error("Failed to start speech recognition:", e);
-      setIsListening(false);
-    }
+      recognition.start();
+    };
+
+    startRecognition();
   };
 
   const handleSend = async () => {
