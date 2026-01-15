@@ -265,13 +265,14 @@ function App() {
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const barWidth = (canvas.width / bufferLength) * 2;
+      const barWidth = (canvas.width / bufferLength) * 2.5;
       let x = 0;
 
       for (let i = 0; i < bufferLength; i++) {
-        const barHeight = (dataArray[i] / 255) * canvas.height;
-        ctx.fillStyle = `rgba(255, 255, 255, ${dataArray[i] / 255})`;
-        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+        // Boost the bar height for better visibility
+        const barHeight = (dataArray[i] / 200) * canvas.height;
+        ctx.fillStyle = 'white';
+        ctx.fillRect(x, (canvas.height - barHeight) / 2, barWidth, barHeight);
         x += barWidth + 1;
       }
     };
@@ -296,22 +297,19 @@ function App() {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Set state IMMEDIATELY so visualizer starts drawing
+      listeningRef.current = true;
+      setIsListening(true);
+
       startVisualizer(stream);
 
-      if (!SpeechRecognition) {
-        alert("Speech-to-text not supported in this browser. Showing volume levels only.");
-        return;
-      }
+      if (!SpeechRecognition) return;
 
       const recognition = new SpeechRecognition();
       recognition.lang = 'en-US';
       recognition.continuous = true;
       recognition.interimResults = true;
-
-      recognition.onstart = () => {
-        listeningRef.current = true;
-        setIsListening(true);
-      };
 
       recognition.onresult = (event) => {
         let transcript = "";
