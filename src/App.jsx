@@ -246,29 +246,29 @@ function App() {
     }
 
     if (listeningRef.current) {
-      console.log("Manual stop requested.");
+      console.log("Shutting down mic...");
       listeningRef.current = false;
       setIsListening(false);
       if (recognitionRef.current) {
         recognitionRef.current.onend = null;
         recognitionRef.current.onerror = null;
         try { recognitionRef.current.stop(); } catch (e) { }
+        recognitionRef.current = null;
       }
       return;
     }
 
     const startRecognition = () => {
-      if (!listeningRef.current && recognitionRef.current) return;
+      if (!listeningRef.current) return;
 
       const recognition = new SpeechRecognition();
       recognition.lang = 'en-US';
       recognition.interimResults = true;
-      recognition.continuous = false; // False + auto-restart is often more stable
+      recognition.continuous = false; // Using false to avoid socket hangups
       recognition.maxAlternatives = 1;
 
       recognition.onstart = () => {
-        console.log("Mic Live...");
-        listeningRef.current = true;
+        console.log("Mic Active...");
         setIsListening(true);
       };
 
@@ -282,9 +282,15 @@ function App() {
 
       recognition.onerror = (event) => {
         console.warn("Speech recognition error:", event.error);
+
         if (event.error === 'network') {
-          console.error("Network error detected. Check your internet or browser speech settings.");
+          console.error("Critical Network Error: Browser cannot reach speech servers.");
+          alert("Microphone network error. This is usually caused by a firewall, VPN, or browser restriction. Please try typing instead.");
+          listeningRef.current = false;
+          setIsListening(false);
+          return; // STOP THE LOOP
         }
+
         if (event.error === 'not-allowed') {
           alert("Microphone permission denied.");
           listeningRef.current = false;
@@ -293,12 +299,12 @@ function App() {
       };
 
       recognition.onend = () => {
+        // Only restart if there was NO network error and user still wants to listen
         if (listeningRef.current) {
-          // Staggered restart to avoid "network" spam if it's failing
-          console.log("Restarting mic loop...");
+          console.log("Restarting mic for continuity...");
           setTimeout(() => {
             if (listeningRef.current) startRecognition();
-          }, 300);
+          }, 400);
         } else {
           setIsListening(false);
         }
@@ -308,7 +314,7 @@ function App() {
       try {
         recognition.start();
       } catch (err) {
-        console.error("Critical Start Error:", err);
+        console.error("Mic Start Failed:", err);
         setIsListening(false);
         listeningRef.current = false;
       }
