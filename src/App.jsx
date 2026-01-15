@@ -46,6 +46,10 @@ function App() {
   const [isListening, setIsListening] = useState(false);
   const listeningRef = useRef(false);
   const recognitionRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const canvasRef = useRef(null);
+  const animationFrameRef = useRef(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -238,87 +242,105 @@ function App() {
     }
   }, [chatHistory, isProcessing]);
 
-  const toggleListening = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Voice recognition is not supported in this browser.");
-      return;
-    }
+  const startVisualizer = (stream) => {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = audioContext.createAnalyser();
+    const source = audioContext.createMediaStreamSource(stream);
+    source.connect(analyser);
+    analyser.fftSize = 64;
 
-    // Toggle logic
+    analyserRef.current = analyser;
+    audioContextRef.current = audioContext;
+
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    const draw = () => {
+      if (!listeningRef.current) return;
+      animationFrameRef.current = requestAnimationFrame(draw);
+      analyser.getByteFrequencyData(dataArray);
+
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const barWidth = (canvas.width / bufferLength) * 2;
+      let x = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        const barHeight = (dataArray[i] / 255) * canvas.height;
+        ctx.fillStyle = `rgba(255, 255, 255, ${dataArray[i] / 255})`;
+        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+        x += barWidth + 1;
+      }
+    };
+    draw();
+  };
+
+  const toggleListening = async () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
     if (listeningRef.current) {
-      console.log("Stopping voice session...");
       listeningRef.current = false;
       setIsListening(false);
       if (recognitionRef.current) {
         recognitionRef.current.onend = null;
         recognitionRef.current.onerror = null;
         try { recognitionRef.current.stop(); } catch (e) { }
-        recognitionRef.current = null;
       }
+      if (audioContextRef.current) audioContextRef.current.close();
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       return;
     }
 
-    // New Singleton logic
-    const startMic = () => {
-      if (!listeningRef.current) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      startVisualizer(stream);
+
+      if (!SpeechRecognition) {
+        alert("Speech-to-text not supported in this browser. Showing volume levels only.");
+        return;
+      }
 
       const recognition = new SpeechRecognition();
       recognition.lang = 'en-US';
-      recognition.continuous = false; // "False" is significantly more stable for Edge cloud sockets
+      recognition.continuous = true;
       recognition.interimResults = true;
 
       recognition.onstart = () => {
-        console.log("Mic Live");
+        listeningRef.current = true;
         setIsListening(true);
       };
 
       recognition.onresult = (event) => {
-        let text = "";
+        let transcript = "";
         for (let i = 0; i < event.results.length; i++) {
-          text += event.results[i][0].transcript;
+          transcript += event.results[i][0].transcript;
         }
-        setInput(text);
+        setInput(transcript);
       };
 
       recognition.onerror = (event) => {
-        console.error("Mic Error:", event.error);
-
+        console.warn("Speech API error:", event.error);
         if (event.error === 'network') {
-          // If network error, wait a moment and try one "re-connect"
-          console.warn("Attempting socket recovery...");
-        } else if (event.error === 'not-allowed') {
-          alert("Mic permission denied.");
-          listeningRef.current = false;
-          setIsListening(false);
+          console.error("Network restriction detected.");
         }
       };
 
       recognition.onend = () => {
         if (listeningRef.current) {
-          // Edge fix: Add a 500ms cooldown before re-opening the socket to avoid the 'network' block
-          console.log("Recycling mic socket...");
-          setTimeout(() => {
-            if (listeningRef.current) startMic();
-          }, 600);
-        } else {
-          setIsListening(false);
-          recognitionRef.current = null;
+          try { recognition.start(); } catch (e) { }
         }
       };
 
       recognitionRef.current = recognition;
-      try {
-        recognition.start();
-      } catch (err) {
-        console.error("Mic failed to open:", err);
-        setIsListening(false);
-        listeningRef.current = false;
-      }
-    };
+      recognition.start();
 
-    listeningRef.current = true;
-    startMic();
+    } catch (err) {
+      console.error("Mic Access Failed:", err);
+      alert("Please allow microphone access in your browser settings.");
+    }
   };
 
   const handleSend = async () => {
@@ -838,7 +860,11 @@ function App() {
               onClick={toggleListening}
               title="Voice Input"
             >
-              <MicIcon />
+              {isListening ? (
+                <canvas ref={canvasRef} width="24" height="24" className="mic-visualizer" />
+              ) : (
+                <MicIcon />
+              )}
             </button>
             <input type="text" placeholder="Type a message..." value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} disabled={isProcessing} />
             <button className={`send-action ${input ? 'active' : ''}`} onClick={handleSend}>{isProcessing ? '...' : <SendIcon />}</button>
