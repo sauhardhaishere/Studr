@@ -241,70 +241,54 @@ function App() {
   const toggleListening = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Voice recognition is not supported in this browser. Please use Chrome.");
+      alert("Voice recognition is not supported in this browser.");
       return;
     }
 
     if (listeningRef.current) {
-      console.log("Shutting down mic...");
       listeningRef.current = false;
       setIsListening(false);
-      if (recognitionRef.current) {
-        recognitionRef.current.onend = null;
-        recognitionRef.current.onerror = null;
-        try { recognitionRef.current.stop(); } catch (e) { }
-        recognitionRef.current = null;
-      }
+      try {
+        if (recognitionRef.current) {
+          recognitionRef.current.onend = null;
+          recognitionRef.current.onerror = null;
+          recognitionRef.current.stop();
+        }
+      } catch (e) { }
       return;
     }
 
     const startRecognition = () => {
       if (!listeningRef.current) return;
-
       const recognition = new SpeechRecognition();
       recognition.lang = 'en-US';
       recognition.interimResults = true;
-      recognition.continuous = false; // Using false to avoid socket hangups
-      recognition.maxAlternatives = 1;
+      recognition.continuous = true;
 
       recognition.onstart = () => {
-        console.log("Mic Active...");
+        listeningRef.current = true;
         setIsListening(true);
       };
 
       recognition.onresult = (event) => {
-        let transcript = "";
+        let text = "";
         for (let i = 0; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
+          text += event.results[i][0].transcript;
         }
-        setInput(transcript);
+        setInput(text);
       };
 
       recognition.onerror = (event) => {
-        console.warn("Speech recognition error:", event.error);
-
         if (event.error === 'network') {
-          console.error("Critical Network Error: Browser cannot reach speech servers.");
-          alert("Microphone network error. This is usually caused by a firewall, VPN, or browser restriction. Please try typing instead.");
-          listeningRef.current = false;
-          setIsListening(false);
-          return; // STOP THE LOOP
-        }
-
-        if (event.error === 'not-allowed') {
-          alert("Microphone permission denied.");
+          alert("Network Error: Edge/Chrome cannot reach speech servers. \n\nFIX: Go to Windows Settings -> Privacy -> Speech and turn on 'Online speech recognition'.");
           listeningRef.current = false;
           setIsListening(false);
         }
       };
 
       recognition.onend = () => {
-        // Only restart if there was NO network error and user still wants to listen
         if (listeningRef.current) {
-          console.log("Restarting mic for continuity...");
-          setTimeout(() => {
-            if (listeningRef.current) startRecognition();
-          }, 400);
+          try { recognition.start(); } catch (e) { }
         } else {
           setIsListening(false);
         }
@@ -313,8 +297,7 @@ function App() {
       recognitionRef.current = recognition;
       try {
         recognition.start();
-      } catch (err) {
-        console.error("Mic Start Failed:", err);
+      } catch (e) {
         setIsListening(false);
         listeningRef.current = false;
       }
