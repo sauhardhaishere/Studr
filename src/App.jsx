@@ -245,28 +245,31 @@ function App() {
       return;
     }
 
+    // Toggle logic
     if (listeningRef.current) {
+      console.log("Stopping voice session...");
       listeningRef.current = false;
       setIsListening(false);
-      try {
-        if (recognitionRef.current) {
-          recognitionRef.current.onend = null;
-          recognitionRef.current.onerror = null;
-          recognitionRef.current.stop();
-        }
-      } catch (e) { }
+      if (recognitionRef.current) {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        try { recognitionRef.current.stop(); } catch (e) { }
+        recognitionRef.current = null;
+      }
       return;
     }
 
-    const startRecognition = () => {
+    // New Singleton logic
+    const startMic = () => {
       if (!listeningRef.current) return;
+
       const recognition = new SpeechRecognition();
       recognition.lang = 'en-US';
+      recognition.continuous = false; // "False" is significantly more stable for Edge cloud sockets
       recognition.interimResults = true;
-      recognition.continuous = true;
 
       recognition.onstart = () => {
-        listeningRef.current = true;
+        console.log("Mic Live");
         setIsListening(true);
       };
 
@@ -279,8 +282,13 @@ function App() {
       };
 
       recognition.onerror = (event) => {
+        console.error("Mic Error:", event.error);
+
         if (event.error === 'network') {
-          alert("Network Error: Edge/Chrome cannot reach speech servers. \n\nFIX: Go to Windows Settings -> Privacy -> Speech and turn on 'Online speech recognition'.");
+          // If network error, wait a moment and try one "re-connect"
+          console.warn("Attempting socket recovery...");
+        } else if (event.error === 'not-allowed') {
+          alert("Mic permission denied.");
           listeningRef.current = false;
           setIsListening(false);
         }
@@ -288,23 +296,29 @@ function App() {
 
       recognition.onend = () => {
         if (listeningRef.current) {
-          try { recognition.start(); } catch (e) { }
+          // Edge fix: Add a 500ms cooldown before re-opening the socket to avoid the 'network' block
+          console.log("Recycling mic socket...");
+          setTimeout(() => {
+            if (listeningRef.current) startMic();
+          }, 600);
         } else {
           setIsListening(false);
+          recognitionRef.current = null;
         }
       };
 
       recognitionRef.current = recognition;
       try {
         recognition.start();
-      } catch (e) {
+      } catch (err) {
+        console.error("Mic failed to open:", err);
         setIsListening(false);
         listeningRef.current = false;
       }
     };
 
     listeningRef.current = true;
-    startRecognition();
+    startMic();
   };
 
   const handleSend = async () => {
