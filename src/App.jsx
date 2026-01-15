@@ -41,6 +41,7 @@ const MicIcon = () => (
 function App() {
   const [session, setSession] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [view, setView] = useState('home');
   const [showTutorial, setShowTutorial] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const listeningRef = useRef(false);
