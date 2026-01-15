@@ -41,9 +41,9 @@ const MicIcon = () => (
 function App() {
   const [session, setSession] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [view, setView] = useState('home');
   const [showTutorial, setShowTutorial] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const listeningRef = useRef(false);
   const recognitionRef = useRef(null);
 
   useEffect(() => {
@@ -238,69 +238,73 @@ function App() {
   }, [chatHistory, isProcessing]);
 
   const toggleListening = () => {
-    if (isListening) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice recognition is not supported in this browser. Please use Chrome.");
+      return;
+    }
+
+    if (listeningRef.current) {
+      // STOP
+      console.log("Stopping mic...");
+      listeningRef.current = false;
       setIsListening(false);
       if (recognitionRef.current) {
-        recognitionRef.current.onend = null; // Prevent restart
         recognitionRef.current.stop();
       }
       return;
     }
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Voice recognition is not supported in this browser. Please use Chrome or Safari.");
-      return;
-    }
+    // START
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = true;
+    recognition.continuous = true;
+    recognition.maxAlternatives = 1;
 
-    const startRecognition = () => {
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'en-US';
-      recognition.interimResults = true;
-      recognition.continuous = false; // False is more reliable on many systems; we'll auto-restart
-
-      recognition.onstart = () => {
-        setIsListening(true);
-        console.log("Mic Live");
-      };
-
-      recognition.onresult = (event) => {
-        let transcript = "";
-        for (let i = 0; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
-        }
-        console.log("Transcript:", transcript);
-        setInput(transcript);
-      };
-
-      recognition.onerror = (event) => {
-        console.error("Mic Error:", event.error);
-        if (event.error === 'no-speech') {
-          // Restart if it's just a silence timeout
-          if (isListening) recognition.start();
-        } else {
-          setIsListening(false);
-        }
-      };
-
-      recognition.onend = () => {
-        // If the user hasn't clicked stop, restart for continuous feeling
-        if (isListening) {
-          try {
-            recognition.start();
-          } catch (e) {
-            console.warn("Recognition restart swallowed:", e);
-          }
-        } else {
-          setIsListening(false);
-        }
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
+    recognition.onstart = () => {
+      console.log("Listening started...");
+      listeningRef.current = true;
+      setIsListening(true);
     };
 
-    startRecognition();
+    recognition.onresult = (event) => {
+      let currentResult = '';
+      for (let i = 0; i < event.results.length; i++) {
+        currentResult += event.results[i][0].transcript;
+      }
+      console.log("Speech Result:", currentResult);
+      setInput(currentResult);
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech Error:", event.error);
+      if (event.error === 'no-speech') {
+        // Just let it be, onend will handle restart if needed
+        return;
+      }
+      if (event.error === 'not-allowed') {
+        alert("Microphone permission denied.");
+        listeningRef.current = false;
+        setIsListening(false);
+      }
+    };
+
+    recognition.onend = () => {
+      console.log("Mic Loop End. Should restart?", listeningRef.current);
+      if (listeningRef.current) {
+        try {
+          recognition.start();
+        } catch (err) {
+          console.error("Auto-restart failed:", err);
+        }
+      } else {
+        setIsListening(false);
+      }
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
   };
 
   const handleSend = async () => {
