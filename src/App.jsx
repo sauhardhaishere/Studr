@@ -246,66 +246,76 @@ function App() {
     }
 
     if (listeningRef.current) {
-      // STOP
-      console.log("Stopping mic...");
+      console.log("Manual stop requested.");
       listeningRef.current = false;
       setIsListening(false);
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        try { recognitionRef.current.stop(); } catch (e) { }
       }
       return;
     }
 
-    // START
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = true;
-    recognition.continuous = true;
-    recognition.maxAlternatives = 1;
+    const startRecognition = () => {
+      if (!listeningRef.current && recognitionRef.current) return;
 
-    recognition.onstart = () => {
-      console.log("Listening started...");
-      listeningRef.current = true;
-      setIsListening(true);
-    };
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = true;
+      recognition.continuous = false; // False + auto-restart is often more stable
+      recognition.maxAlternatives = 1;
 
-    recognition.onresult = (event) => {
-      let currentResult = '';
-      for (let i = 0; i < event.results.length; i++) {
-        currentResult += event.results[i][0].transcript;
-      }
-      console.log("Speech Result:", currentResult);
-      setInput(currentResult);
-    };
+      recognition.onstart = () => {
+        console.log("Mic Live...");
+        listeningRef.current = true;
+        setIsListening(true);
+      };
 
-    recognition.onerror = (event) => {
-      console.error("Speech Error:", event.error);
-      if (event.error === 'no-speech') {
-        // Just let it be, onend will handle restart if needed
-        return;
-      }
-      if (event.error === 'not-allowed') {
-        alert("Microphone permission denied.");
-        listeningRef.current = false;
-        setIsListening(false);
-      }
-    };
-
-    recognition.onend = () => {
-      console.log("Mic Loop End. Should restart?", listeningRef.current);
-      if (listeningRef.current) {
-        try {
-          recognition.start();
-        } catch (err) {
-          console.error("Auto-restart failed:", err);
+      recognition.onresult = (event) => {
+        let transcript = "";
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
         }
-      } else {
+        setInput(transcript);
+      };
+
+      recognition.onerror = (event) => {
+        console.warn("Speech recognition error:", event.error);
+        if (event.error === 'network') {
+          console.error("Network error detected. Check your internet or browser speech settings.");
+        }
+        if (event.error === 'not-allowed') {
+          alert("Microphone permission denied.");
+          listeningRef.current = false;
+          setIsListening(false);
+        }
+      };
+
+      recognition.onend = () => {
+        if (listeningRef.current) {
+          // Staggered restart to avoid "network" spam if it's failing
+          console.log("Restarting mic loop...");
+          setTimeout(() => {
+            if (listeningRef.current) startRecognition();
+          }, 300);
+        } else {
+          setIsListening(false);
+        }
+      };
+
+      recognitionRef.current = recognition;
+      try {
+        recognition.start();
+      } catch (err) {
+        console.error("Critical Start Error:", err);
         setIsListening(false);
+        listeningRef.current = false;
       }
     };
 
-    recognitionRef.current = recognition;
-    recognition.start();
+    listeningRef.current = true;
+    startRecognition();
   };
 
   const handleSend = async () => {
