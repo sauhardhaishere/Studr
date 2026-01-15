@@ -15,14 +15,16 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       "english": "english", "eng": "english", "englsh": "english",
       "biology": "biology", "bio": "biology", "chemistry": "chemistry", "chem": "chemistry",
       "spanish": "spanish", "sapnish": "spanish", "spansih": "spanish", "span": "spanish", "spanihs": "spanish",
-      "physics": "physics", "phys": "physics"
+      "physics": "physics", "phys": "physics",
+      "tommorow": "tomorrow", "tommorrow": "tomorrow", "tmrw": "tomorrow", "wenesday": "wednesday", "wensday": "wednesday"
     };
 
     let processedInput = userCleanInput;
     Object.keys(corrections).forEach(typo => {
-      // Use regex for whole-word or substring match safety
-      const regex = new RegExp(typo, 'g');
+      const regex = new RegExp(`\\b${typo}\\b`, 'g'); // Whole word match for typo correction
       processedInput = processedInput.replace(regex, corrections[typo]);
+      // Fallback for non-boundary cases if needed
+      if (processedInput.includes(typo)) processedInput = processedInput.replace(typo, corrections[typo]);
     });
 
     const commonSubjects = ["math", "science", "history", "english", "spanish", "physics", "biology", "chemistry", "algebra", "geometry", "calculus", "stats", "latin"];
@@ -66,29 +68,42 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         };
 
         const parseDateFromText = (text) => {
-          let target = new Date(today);
+          let target = new Date(today.getTime());
+          target.setHours(0, 0, 0, 0);
           let dateFound = false;
+          const lowText = text.toLowerCase();
+
           const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december", "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-          const monthFound = months.find(m => text.toLowerCase().includes(m));
+          const monthFound = months.find(m => lowText.includes(m));
 
-          // Improved Regex: ensure we don't pick up PM/AM times as days
-          const numMatch = text.match(/(?:on\s+)?(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?(?!\s*(?:am|pm|:))/i);
-          const dayNum = numMatch ? parseInt(numMatch[1]) : null;
+          // 1. Check for "in X days"
+          const inDaysMatch = lowText.match(/in\s+(\d+)\s+day/);
+          if (inDaysMatch) {
+            target.setDate(today.getDate() + parseInt(inDaysMatch[1]));
+            return target;
+          }
 
-          if (dayNum && dayNum <= 31) {
+          // 2. Exact Day Matching (e.g., "Jan 20")
+          // Avoid matching 8 in "8 am" by checking for boundaries and ensuring it's not a time
+          const dayMatch = lowText.match(/(?:\b|on\s+|the\s+)(\d{1,2})(?:st|nd|rd|th)?\b(?!\s*[:\.]\d+|[hrs]*\s*(?:am|pm))/i);
+          const dayNum = dayMatch ? parseInt(dayMatch[1]) : null;
+
+          if (dayNum && dayNum <= 31 && (monthFound || lowText.includes("the "))) {
             if (monthFound) target.setMonth(months.indexOf(monthFound) % 12);
             target.setDate(dayNum);
-            // If the date is significantly in the past, assume next month
             if (target.getTime() < today.getTime() - 86400000 && !monthFound) {
               target.setMonth(target.getMonth() + 1);
             }
             dateFound = true;
           }
 
+          // 3. Relative Day Matching (e.g., "tomorrow", "Wednesday")
           if (!dateFound) {
-            const lowText = text.toLowerCase();
-            if (lowText.includes("tomorrow")) { target.setDate(today.getDate() + 1); dateFound = true; }
-            else if (lowText.includes("today") || lowText.includes("tonight") || lowText.includes("tonite")) {
+            if (lowText.includes("tomorrow")) {
+              target.setDate(today.getDate() + 1);
+              dateFound = true;
+            }
+            else if (lowText.includes("today") || lowText.includes("tonight")) {
               dateFound = true;
             }
             else {
