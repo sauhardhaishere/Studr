@@ -207,19 +207,24 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
         // --- BRAIN: HANDLE ASSIGNMENTS / HW ---
         if (isAssignmentRequest) {
-          const date = parseDateFromText(processedInput) || today;
-          const dStr = formatDate(date);
+          const deadlineDate = parseDateFromText(processedInput) || today;
+          let workDate = new Date(deadlineDate);
 
-          // Try to extract a specific deadline time if mentioned
+          // Try to extract a specific deadline time
           const deadlineMatch = processedInput.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
-          const deadlineTime = deadlineMatch ? deadlineMatch[0].toUpperCase() : "11:59 PM";
+          const deadlineTime = deadlineMatch ? deadlineMatch[1] + (deadlineMatch[2] ? ":" + deadlineMatch[2] : "") + " " + deadlineMatch[3].toUpperCase() : "11:59 PM";
+          const deadlineH = parseTimeString(deadlineTime);
 
-          // Logic: Find a gap today or before deadline
+          // LOGIC: If due tommorow morning (before 10am), we MUST work on it TODAY.
+          if (formatDate(deadlineDate) === formatDate(new Date(today.getTime() + 86400000)) && deadlineH < 10) {
+            workDate = new Date(today);
+          }
+
+          const dStr = formatDate(workDate);
           const nowH = today.getHours() + (today.getMinutes() / 60);
           let targetH = 16; // default 4 PM
 
-          if (formatDate(date) === formatDate(today)) {
-            // If due tonight, we need to do it soon if it's already late
+          if (formatDate(workDate) === formatDate(today)) {
             targetH = Math.max(16, Math.ceil(nowH + 0.5));
           }
 
@@ -241,10 +246,10 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
             type: "study",
             priority: "medium",
             resources,
-            description: `• Work on ${name} assignment.\n• OFFICIAL DEADLINE: ${dStr} at ${deadlineTime}`
+            description: `• Work on ${name} assignment.\n• DEADLINE: ${formatDate(deadlineDate)} at ${deadlineTime}`
           });
 
-          return resolve({ newTasks, message: `I've scheduled a session for your ${name} assignment for ${dStr} at ${finalTime}. The final deadline is noted as ${deadlineTime}!` });
+          return resolve({ newTasks, message: `I've scheduled your ${name} assignment for ${dStr} at ${finalTime}. Since it's due early tomorrow morning, I made sure you finish it today!` });
         }
 
         // Context-aware fallback
