@@ -269,9 +269,10 @@ function App() {
       let x = 0;
 
       for (let i = 0; i < bufferLength; i++) {
-        // Boost the bar height for better visibility
-        const barHeight = (dataArray[i] / 200) * canvas.height;
-        ctx.fillStyle = 'white';
+        const barHeight = (dataArray[i] / 150) * canvas.height; // Slightly more sensitive
+        ctx.fillStyle = '#00aaff'; // Vibrant Blue
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = '#00aaff';
         ctx.fillRect(x, (canvas.height - barHeight) / 2, barWidth, barHeight);
         x += barWidth + 1;
       }
