@@ -118,7 +118,11 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
         // --- SUBJECT & CLASS RESOLUTION ---
         const lookup = [...commonSubjects, ...globalExams].sort((a, b) => b.length - a.length);
-        const subId = lookup.find(s => processedInput.includes(s)) || lookup.find(s => lastAILower.includes(s)) || lookup.find(s => conversationContext.toLowerCase().includes(s));
+
+        // Priority: 1. Current Message, 2. Previous AI context (for intensity follow-ups), 3. General history
+        const subId = lookup.find(s => processedInput.includes(s)) ||
+          (isIntensityQuestion ? lookup.find(s => lastAILower.includes(s)) : null) ||
+          lookup.find(s => conversationContext.toLowerCase().includes(s));
 
         const classMatch = schedule && subId && schedule.find(c => {
           const n = c.name.toLowerCase();
