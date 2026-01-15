@@ -7,23 +7,37 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
     const lastUserMsg = lines.filter(l => l.startsWith('User:')).pop()?.replace('User:', '').trim() || '';
     const userCleanInput = lastUserMsg.toLowerCase();
 
-    // Subjects that are so common the AI doesn't need to "search the web" (Instant response)
-    const commonSubjects = ["math", "science", "history", "english", "spanish", "physics", "bio", "chem", "biology", "chemistry", "algebra", "geometry", "calc", "calculus", "stats"];
+    // TYPO CORRECTION
+    const corrections = {
+      "sciecne": "science", "scence": "science", "sci": "science",
+      "math": "math", "calculus": "calculus", "calclus": "calculus", "calc": "calculus",
+      "history": "history", "hist": "history", "english": "english", "eng": "english",
+      "biology": "biology", "bio": "biology", "chemistry": "chemistry", "chem": "chemistry",
+      "spanish": "spanish", "span": "spanish", "physics": "physics", "phys": "physics"
+    };
+
+    let processedInput = userCleanInput;
+    Object.keys(corrections).forEach(typo => {
+      if (processedInput.includes(typo)) {
+        processedInput = processedInput.replace(typo, corrections[typo]);
+      }
+    });
+
+    const commonSubjects = ["math", "science", "history", "english", "spanish", "physics", "biology", "chemistry", "algebra", "geometry", "calculus", "stats", "latin"];
     const globalExams = ["gaokao", "sat", "act", "lsat", "mcat", "ap", "gre", "gmat"];
 
-    // Only show "Thinking/Searching" steps for heavy global exams (Gaokao, SAT, etc.)
-    const isStandardizedTest = globalExams.some(e => userCleanInput.includes(e));
-    const isTestRequest = userCleanInput.includes("test") || userCleanInput.includes("exam") || userCleanInput.includes("quiz");
-    const isSearchNeeded = isStandardizedTest; // Only search for heavy standardized tests
+    // Fast path triggers
+    const isStandardizedTest = globalExams.some(e => processedInput.includes(e));
+    const isTestRequest = processedInput.includes("test") || processedInput.includes("exam") || processedInput.includes("quiz");
+    const isSearchNeeded = isStandardizedTest;
 
     setTimeout(async () => {
       try {
         let newTasks = [];
-        let newClasses = [];
         const lastAILine = lines.filter(l => l.startsWith('Calendly:')).pop() || '';
         const lastAILower = lastAILine.toLowerCase();
 
-        // --- HELPER WRAPPERS ---
+        // --- HELPERS ---
         const daysOfWeek = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
         const formatDate = (dateObj) => dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         const getDayNameFromDate = (dateObj) => dateObj.toLocaleDateString('en-US', { weekday: 'long' });
@@ -57,10 +71,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           const dayNum = numMatch ? parseInt(numMatch[1]) : null;
 
           if (dayNum && dayNum <= 31) {
-            if (monthFound) {
-              const monthIdx = months.indexOf(monthFound) % 12;
-              target.setMonth(monthIdx);
-            }
+            if (monthFound) target.setMonth(months.indexOf(monthFound) % 12);
             target.setDate(dayNum);
             if (target < today && !monthFound) target.setMonth(target.getMonth() + 1);
             dateFound = true;
@@ -85,106 +96,73 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           return dateFound ? target : null;
         };
 
-        const getOptimalTaskTime = (date) => {
+        const getOptimalTime = (date) => {
           const dName = getDayNameFromDate(date);
-          const dayFreeRange = activities.find(s => s.isFreeSlot && (s.appliedDays?.includes(dName) || s.frequency === 'daily'));
-          let start = 16;
-          if (dayFreeRange) {
-            const parts = dayFreeRange.time.split(' - ');
-            start = parseTimeString(parts[0]) || 16;
-          }
-          return formatTimeFromDecimal(start);
+          const free = activities.find(s => s.isFreeSlot && (s.appliedDays?.includes(dName) || s.frequency === 'daily'));
+          return formatTimeFromDecimal(free ? parseTimeString(free.time.split(' - ')[0]) || 16 : 16);
         };
 
-        const getResources = () => [
+        const resources = [
           { label: "Study Coach (AI)", url: "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n" },
           { label: "Knowt", url: "https://knowt.com" },
           { label: "Quizlet", url: "https://quizlet.com" }
         ];
 
-        // --- SUBJECT EXTRACTION ---
-        const subjectMap = [...commonSubjects, ...globalExams];
-        const extractSubject = (text) => {
-          const t = text.toLowerCase();
-          if (t.includes("gaokao") || t.includes("gaokoa")) return "gaokao";
-          // Find the most specific match (longer strings first)
-          const sortedMap = [...subjectMap].sort((a, b) => b.length - a.length);
-          return sortedMap.find(s => t.includes(s)) || null;
-        };
+        // --- SUBJECT & CLASS RESOLUTION ---
+        const lookup = [...commonSubjects, ...globalExams].sort((a, b) => b.length - a.length);
+        const subId = lookup.find(s => processedInput.includes(s)) || lookup.find(s => lastAILower.includes(s));
 
-        const subIdentifier = extractSubject(userCleanInput) || extractSubject(lastAILower) || null;
-
-        // Find if this subject belongs to an existing class
-        const classMatch = schedule && subIdentifier && schedule.find(c => {
-          const name = c.name.toLowerCase();
-          const subj = (c.subject || "").toLowerCase();
-          return name.includes(subIdentifier) || subj.includes(subIdentifier);
+        const classMatch = schedule && subId && schedule.find(c => {
+          const n = c.name.toLowerCase();
+          const s = (c.subject || "").toLowerCase();
+          return n.includes(subId) || s.includes(subId);
         });
 
-        // Resolve Final Display Name: Priority 1: Official Class Name, Priority 2: Identified Subject, Priority 3: "Test"
-        const subDisplayName = classMatch ? classMatch.name : (subIdentifier ? subIdentifier.charAt(0).toUpperCase() + subIdentifier.slice(1) : "Test");
+        const name = classMatch ? classMatch.name : (subId ? subId.charAt(0).toUpperCase() + subId.slice(1) : "General");
 
-        const isIntensitySelection = lastAILower.includes("intensity") || lastAILower.includes("normal, moderate, or hardcore");
-
-        // --- INTENSITY LOGIC ---
-        if (isIntensitySelection) {
-          const intensity = userCleanInput.includes("hard") ? "Hardcore" : (userCleanInput.includes("mod") ? "Moderate" : "Normal");
-          const sessions = intensity === "Hardcore" ? 6 : (intensity === "Moderate" ? 4 : 2);
-          const originalDate = parseDateFromText(conversationContext) || new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-          const deadlineStr = formatDate(originalDate);
-
-          newTasks.push({ id: crypto.randomUUID(), title: `${subDisplayName} Test`, time: `${deadlineStr}, 8:00 AM`, type: "task", priority: "high" });
-          for (let i = 1; i <= sessions; i++) {
-            const d = new Date(originalDate);
-            d.setDate(d.getDate() - i);
-            if (d >= today) {
-              newTasks.push({
-                id: crypto.randomUUID(), title: `${subDisplayName} Prep ${i}`, time: `${formatDate(d)}, ${getOptimalTaskTime(d)}`,
-                type: "study", resources: getResources(), description: `• Focus on ${intensity} practice.`
-              });
-            }
-          }
-          return resolve({ newTasks, message: `Got it! I've built your ${intensity} study plan for ${subDisplayName}.` });
-        }
-
-        // --- SCHEDULING LOGIC ---
-        const date = parseDateFromText(userCleanInput);
+        const date = parseDateFromText(processedInput);
         if (date && (isTestRequest || isStandardizedTest)) {
-          const deadlineStr = formatDate(date);
-          const diffDays = Math.floor((date - today) / (1000 * 60 * 60 * 24));
+          const dStr = formatDate(date);
+          const diff = Math.floor((date - today) / 86400000);
 
-          // Simulate search steps ONLY if it's a global exam
           if (onStep && isSearchNeeded) {
-            onStep(`Searching live web for ${subDisplayName} insights...`);
-            await new Promise(r => setTimeout(r, 1200));
-            onStep(`Mapping ${subDisplayName} into your schedule...`);
-            await new Promise(r => setTimeout(r, 800));
+            onStep(`Analyzing ${name} study patterns...`);
+            await new Promise(r => setTimeout(r, 1000));
           }
 
-          if (diffDays > 14) {
-            return resolve({ message: `I've noted your ${subDisplayName} test for ${deadlineStr}. Since it's far away, would you like a Normal, Moderate, or Hardcore plan?` });
+          if (diff > 14 && !lastAILower.includes("intensity")) {
+            return resolve({ message: `I've noted your ${name} test for ${dStr}. Would you like a Normal, Moderate, or Hardcore plan?` });
           }
 
-          newTasks.push({ id: crypto.randomUUID(), title: `${subDisplayName} Test`, time: `${deadlineStr}, 8:00 AM`, type: "task", priority: "high" });
-          const sessions = diffDays > 7 ? 3 : 2;
+          const isIntensity = lastAILower.includes("intensity") || lastAILower.includes("plan?");
+          const mode = isIntensity ? (processedInput.includes("hard") ? "Hardcore" : (processedInput.includes("mod") ? "Moderate" : "Normal")) : "Normal";
+          const sessions = mode === "Hardcore" ? 6 : (mode === "Moderate" ? 4 : 2);
+
+          // TASK 1: THE TEST
+          newTasks.push({ id: crypto.randomUUID(), title: `${name} Test`, time: `${dStr}, 8:00 AM`, type: "task", priority: "high", description: `• Exam day.` });
+
+          // TASKS 2+: PREP SESSIONS
           for (let i = 1; i <= sessions; i++) {
             const d = new Date(date);
             d.setDate(d.getDate() - i);
             if (d >= today) {
+              const isFinal = (i === 1);
               newTasks.push({
-                id: crypto.randomUUID(), title: `${subDisplayName} Review ${i}`, time: `${formatDate(d)}, ${getOptimalTaskTime(d)}`,
-                type: "study", resources: getResources(), description: "• Review key concepts and active recall."
+                id: crypto.randomUUID(),
+                title: `${name} ${isFinal ? 'Final Review' : 'Prep'}`,
+                time: `${formatDate(d)}, ${getOptimalTime(d)}`,
+                type: "study", resources,
+                description: `• ${isFinal ? 'Active recall and final concept check.' : 'Focus on practice problems and note review.'}`
               });
             }
           }
-          return resolve({ newTasks, message: `I've mapped out a specific study plan for your ${subDisplayName} test on ${deadlineStr}.` });
+          return resolve({ newTasks, message: `I've mapped out a high-performance ${mode} plan for your ${name} test on ${dStr}.` });
         }
 
         resolve({ newTasks: [], message: "Hey! I'm Calendly. Ready to build a high-performance study plan?" });
       } catch (err) {
-        console.error("Mock AI Error:", err);
         resolve({ newTasks: [], message: "I'm having a bit of trouble. Could you try again?" });
       }
-    }, isSearchNeeded ? 500 : 10);
+    }, isSearchNeeded ? 1000 : 10);
   });
 };
