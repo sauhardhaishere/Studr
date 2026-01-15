@@ -154,35 +154,46 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           }
 
           const mode = processedInput.includes("hard") ? "Hardcore" : (processedInput.includes("mod") ? "Moderate" : "Normal");
-          const sessions = mode === "Hardcore" ? 6 : (mode === "Moderate" ? 4 : 2);
+          const sessions = mode === "Hardcore" ? 7 : (mode === "Moderate" ? 5 : 3);
 
           // TASK 1: THE TEST
           newTasks.push({ id: crypto.randomUUID(), title: `${name} Test`, time: `${dStr}, 8:00 AM`, type: "task", priority: "high", description: `• Exam day.` });
 
-          // TASKS 2+: PREP SESSIONS
+          // TASKS 2+: SPACED REPETITION SESSIONS
           let sessionsAdded = 0;
-          for (let i = 1; i <= sessions + 2; i++) {
-            if (sessionsAdded >= sessions) break;
-            const d = new Date(date);
-            d.setDate(d.getDate() - i);
 
-            // Strictly check if date is not in the past relative to today
-            if (d.setHours(23, 59, 59, 999) >= today.getTime()) {
-              const bestTime = getOptimalTime(d);
-              if (bestTime) {
-                const isFinal = (sessionsAdded === 0);
-                newTasks.push({
-                  id: crypto.randomUUID(),
-                  title: `${name} ${isFinal ? 'Final Review' : 'Prep'}`,
-                  time: `${formatDate(d)}, ${bestTime}`,
-                  type: "study", resources,
-                  description: `• ${isFinal ? 'Active recall and final concept check.' : 'Focus on practice problems and note review.'}`
-                });
-                sessionsAdded++;
-              }
+          // Calculate Spacing Logic
+          // If the test is more than 14 days away, we space them out.
+          // Otherwise, we group them closer.
+          const interval = diff > 21 ? Math.floor(diff / sessions) : (diff > 10 ? 3 : 1);
+
+          for (let i = 1; i <= sessions; i++) {
+            const d = new Date(date);
+
+            // The first session (i=1) is ALWAYS the day before (Final Review)
+            // Subsequent sessions are spaced out using the calculated interval
+            const daysBack = i === 1 ? 1 : (i - 1) * interval;
+            d.setDate(d.getDate() - daysBack);
+
+            // Safety: Never schedule in the past
+            if (d.setHours(23, 59, 59, 999) < today.getTime()) continue;
+
+            const bestTime = getOptimalTime(d);
+            if (bestTime) {
+              const isFinal = (i === 1);
+              newTasks.push({
+                id: crypto.randomUUID(),
+                title: `${name} ${isFinal ? 'Final Review' : 'Prep'}`,
+                time: `${formatDate(d)}, ${bestTime}`,
+                type: "study", resources,
+                description: isFinal
+                  ? `• Final Spaced Review: Active recall on high-yield ${name} concepts.`
+                  : `• Repetition Session: Focusing on weak areas and practice sets.`
+              });
+              sessionsAdded++;
             }
           }
-          return resolve({ newTasks, message: `I've mapped out a high-performance ${mode} plan for your ${name} test on ${dStr}.` });
+          return resolve({ newTasks, message: `I've mapped out a high-performance ${mode} plan for your ${name} test on ${dStr}. This uses spaced repetition across ${sessionsAdded} sessions to maximize retention.` });
         }
 
         // Context-aware fallback

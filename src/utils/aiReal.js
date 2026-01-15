@@ -40,13 +40,15 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - **HANDLING REPLIES**: If the user provides a name, **AUTOCORRECT TYPOS** (e.g. "Calclus" -> "Calculus") before creating it.
        - **IMMEDIATE ACTION**: After creating the class, IMMEDIATELY schedule the original request.
 
-    3. **STUDY HELPER PROTOCOL (SCALABLE PLANS):**
+    3. **STUDY HELPER PROTOCOL (SPACED REPETITION):**
        - **TESTS**: Generate a multi-day plan (Test Task + Prep sessions).
+       - **SPACING**: Use **Spaced Repetition**. If a test is far away (> 14 days), distribute the prep sessions across the entire duration (e.g., every 3-5 days) to maximize long-term retention. 
        - **SCALING**: 
-         - If Test is < 1 week away: 2 sessions.
-         - If Test is 1-2 weeks away: 4 sessions.
-         - If Test is > 2 weeks away: Stop and ask for **INTENSITY LEVEL**: "I've noted your test! Would you like a Normal, Moderate, or Hardcore study plan?"
-       - **TIMING**: Always place the 'Final Review' session EXACTLY 1 day before the test. Space other sessions out leading up to it.
+         - If Test is < 1 week away: 2-3 sessions (Clustered).
+         - If Test is 1-2 weeks away: 4 sessions (Spaced).
+         - If Test is > 2 weeks away: ASK FOR **INTENSITY LEVEL**: "I've noted your test! Would you like a Normal, Moderate, or Hardcore study plan?"
+         - **SESSIONS**: Normal = 3 sessions, Moderate = 5 sessions, Hardcore = 7 sessions.
+       - **TIMING**: Always place the 'Final Review' session EXACTLY 1 day before the test.
 
     4. **SMART GAP-FINDING & DURATION MATH:**
        - **NO PAST SCHEDULING**: never pick a time in the past for TODAY.
