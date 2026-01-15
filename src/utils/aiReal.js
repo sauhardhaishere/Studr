@@ -49,13 +49,19 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
          - If Test is > 2 weeks away: ASK FOR **INTENSITY LEVEL**: "I've noted your test! Would you like a Normal, Moderate, or Hardcore study plan?"
          - **SESSIONS**: Normal = 3 sessions, Moderate = 5 sessions, Hardcore = 7 sessions.
        - **TIMING**: Always place the 'Final Review' session EXACTLY 1 day before the test.
-
-    4. **SMART GAP-FINDING & DURATION MATH:**
+ 
+    4. **ASSIGNMENT PROTOCOL (HW & PROJECTS):**
+       - **RECOGNITION**: Detect keywords like "homework", "hw", "assignment", or "due".
+       - **GAP FINDING**: You MUST check the 'User Routine' and 'Existing Tasks' provided in the context.
+       - **OPTIMIZATION**: Find a 1-hour gap today or tomorrow BEFORE the deadline. Ensure it does NOT overlap with a class or an existing study session.
+       - **DESCRIPTION**: Include the deadline in the task description.
+ 
+    5. **SMART GAP-FINDING & DURATION MATH:**
        - **NO PAST SCHEDULING**: never pick a time in the past for TODAY.
        - **USER OVERRIDE**: If user says "any" or "anytime", pick 4 PM or the best available slot between 3 PM and 9 PM.
        - **NO BOLDING**: Do NOT use **bold** in your response messages.
 
-    5. **RESOURCES & ASSETS**:
+    6. **RESOURCES & ASSETS**:
        - ALWAYS include these resources in EVERY study/prep task:
          1. {"label": "Study Coach (AI)", "url": "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n"}
          2. {"label": "Knowt", "url": "https://knowt.com"}

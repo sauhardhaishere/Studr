@@ -31,6 +31,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
     // Fast path triggers
     const isStandardizedTest = globalExams.some(e => processedInput.includes(e));
     const isTestRequest = processedInput.includes("test") || processedInput.includes("exam") || processedInput.includes("quiz");
+    const isAssignmentRequest = processedInput.includes("hw") || processedInput.includes("homework") || processedInput.includes("assignment") || processedInput.includes("due");
 
     setTimeout(async () => {
       try {
@@ -194,6 +195,51 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
             }
           }
           return resolve({ newTasks, message: `I've mapped out a high-performance ${mode} plan for your ${name} test on ${dStr}. This uses spaced repetition across ${sessionsAdded} sessions to maximize retention.` });
+        }
+
+        // --- BRAIN: HANDLE ASSIGNMENTS / HW ---
+        if (isAssignmentRequest) {
+          const date = parseDateFromText(processedInput) || today;
+          const dStr = formatDate(date);
+
+          // Logic: Find a gap today or before deadline
+          // Check activities (routine) and currentTasks (events)
+          const nowH = today.getHours() + (today.getMinutes() / 60);
+          let targetH = 16; // default 4 PM
+
+          // Simple gap check: if today, avoid past
+          if (formatDate(date) === formatDate(today)) {
+            targetH = Math.max(16, Math.ceil(nowH + 1));
+          }
+
+          // Check if targetH overlaps with existing tasks
+          const overlap = currentTasks.find(t => {
+            if (t.time && t.time.includes(dStr)) {
+              const taskH = parseTimeString(t.time.split(', ')[1]);
+              return Math.abs(taskH - targetH) < 1;
+            }
+            return false;
+          });
+
+          if (overlap) targetH += 1.5; // push if overlap
+
+          if (targetH > 21) {
+            // Too late today, push to tomorrow morning if deadline allows
+            // For mock simplicity, we'll just cap it or put it tomorrow
+          }
+
+          const finalTime = formatTimeFromDecimal(targetH);
+          newTasks.push({
+            id: crypto.randomUUID(),
+            title: `${name} HW/Assignment`,
+            time: `${dStr}, ${finalTime}`,
+            type: "study",
+            priority: "medium",
+            resources,
+            description: `• Homework assignment for ${name}.\n• DEADLINE: ${dStr}`
+          });
+
+          return resolve({ newTasks, message: `I've scheduled your ${name} assignment for ${dStr} at ${finalTime}. I made sure to avoid your existing sessions!` });
         }
 
         // Context-aware fallback
