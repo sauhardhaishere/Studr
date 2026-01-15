@@ -11,16 +11,18 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
     const corrections = {
       "sciecne": "science", "scence": "science", "sci": "science",
       "math": "math", "calculus": "calculus", "calclus": "calculus", "calc": "calculus",
-      "history": "history", "hist": "history", "english": "english", "eng": "english",
+      "history": "history", "hisotry": "history", "histry": "history", "hist": "history",
+      "english": "english", "eng": "english", "englsh": "english",
       "biology": "biology", "bio": "biology", "chemistry": "chemistry", "chem": "chemistry",
-      "spanish": "spanish", "span": "spanish", "physics": "physics", "phys": "physics"
+      "spanish": "spanish", "sapnish": "spanish", "spansih": "spanish", "span": "spanish", "spanihs": "spanish",
+      "physics": "physics", "phys": "physics"
     };
 
     let processedInput = userCleanInput;
     Object.keys(corrections).forEach(typo => {
-      if (processedInput.includes(typo)) {
-        processedInput = processedInput.replace(typo, corrections[typo]);
-      }
+      // Use regex for whole-word or substring match safety
+      const regex = new RegExp(typo, 'g');
+      processedInput = processedInput.replace(regex, corrections[typo]);
     });
 
     const commonSubjects = ["math", "science", "history", "english", "spanish", "physics", "biology", "chemistry", "algebra", "geometry", "calculus", "stats", "latin"];
@@ -119,10 +121,18 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         // --- SUBJECT & CLASS RESOLUTION ---
         const lookup = [...commonSubjects, ...globalExams].sort((a, b) => b.length - a.length);
 
-        // Priority: 1. Current Message, 2. Previous AI context (for intensity follow-ups), 3. General history
-        const subId = lookup.find(s => processedInput.includes(s)) ||
-          (isIntensityQuestion ? lookup.find(s => lastAILower.includes(s)) : null) ||
-          lookup.find(s => conversationContext.toLowerCase().includes(s));
+        // Priority 1: Current message (processed input with typos fixed)
+        let subId = lookup.find(s => processedInput.includes(s));
+
+        // Priority 2: If we are answering an intensity question, look for the previous subject
+        if (!subId && isIntensityQuestion) {
+          subId = lookup.find(s => lastAILower.includes(s));
+        }
+
+        // Priority 3: Last resort - search history
+        if (!subId) {
+          subId = lookup.find(s => conversationContext.toLowerCase().includes(s));
+        }
 
         const classMatch = schedule && subId && schedule.find(c => {
           const n = c.name.toLowerCase();
