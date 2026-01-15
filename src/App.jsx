@@ -34,22 +34,12 @@ const ChevronLeft = () => (
 const ChevronRight = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
 )
-const MicIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
-)
 
 function App() {
   const [session, setSession] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [view, setView] = useState('home');
   const [showTutorial, setShowTutorial] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const listeningRef = useRef(false);
-  const recognitionRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const analyserRef = useRef(null);
-  const canvasRef = useRef(null);
-  const animationFrameRef = useRef(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -242,108 +232,6 @@ function App() {
     }
   }, [chatHistory, isProcessing]);
 
-  const startVisualizer = (stream) => {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const analyser = audioContext.createAnalyser();
-    const source = audioContext.createMediaStreamSource(stream);
-    source.connect(analyser);
-    analyser.fftSize = 64;
-
-    analyserRef.current = analyser;
-    audioContextRef.current = audioContext;
-
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-
-    const draw = () => {
-      if (!listeningRef.current) return;
-      animationFrameRef.current = requestAnimationFrame(draw);
-      analyser.getByteFrequencyData(dataArray);
-
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const barWidth = (canvas.width / bufferLength) * 2.5;
-      let x = 0;
-
-      for (let i = 0; i < bufferLength; i++) {
-        const barHeight = (dataArray[i] / 150) * canvas.height; // Slightly more sensitive
-        ctx.fillStyle = '#00aaff'; // Vibrant Blue
-        ctx.shadowBlur = 4;
-        ctx.shadowColor = '#00aaff';
-        ctx.fillRect(x, (canvas.height - barHeight) / 2, barWidth, barHeight);
-        x += barWidth + 1;
-      }
-    };
-    draw();
-  };
-
-  const toggleListening = async () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (listeningRef.current) {
-      listeningRef.current = false;
-      setIsListening(false);
-      if (recognitionRef.current) {
-        recognitionRef.current.onend = null;
-        recognitionRef.current.onerror = null;
-        try { recognitionRef.current.stop(); } catch (e) { }
-      }
-      if (audioContextRef.current) audioContextRef.current.close();
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-      // Set state IMMEDIATELY so visualizer starts drawing
-      listeningRef.current = true;
-      setIsListening(true);
-
-      startVisualizer(stream);
-
-      if (!SpeechRecognition) return;
-
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'en-US';
-      recognition.continuous = false; // Minimal network load
-      recognition.interimResults = false; // Only send the final result to reduce socket chatter
-
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        console.log("Final Transcript:", transcript);
-        setInput(transcript);
-      };
-
-      recognition.onerror = (event) => {
-        console.error("Speech API error:", event.error);
-      };
-
-      recognition.onend = () => {
-        if (listeningRef.current) {
-          // One-second delay before next capture to keep network happy
-          setTimeout(() => {
-            if (listeningRef.current) {
-              try { recognition.start(); } catch (e) { }
-            }
-          }, 1000);
-        } else {
-          setIsListening(false);
-          recognitionRef.current = null;
-        }
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
-
-    } catch (err) {
-      console.error("Mic Access Failed:", err);
-      alert("Please allow microphone access in your browser settings.");
-    }
-  };
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -857,17 +745,7 @@ function App() {
         </div>
         <div className="chat-input-area">
           <div className="ai-input-bar">
-            <button
-              className={`mic-action ${isListening ? 'listening' : ''}`}
-              onClick={toggleListening}
-              title="Voice Input"
-            >
-              {isListening ? (
-                <canvas ref={canvasRef} width="24" height="24" className="mic-visualizer" />
-              ) : (
-                <MicIcon />
-              )}
-            </button>
+
             <input type="text" placeholder="Type a message..." value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} disabled={isProcessing} />
             <button className={`send-action ${input ? 'active' : ''}`} onClick={handleSend}>{isProcessing ? '...' : <SendIcon />}</button>
           </div>
