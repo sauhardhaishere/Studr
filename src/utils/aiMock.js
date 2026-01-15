@@ -70,27 +70,35 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           let dateFound = false;
           const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december", "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
           const monthFound = months.find(m => text.toLowerCase().includes(m));
-          const numMatch = text.match(/(?:on\s+)?(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?/i);
+
+          // Improved Regex: ensure we don't pick up PM/AM times as days
+          const numMatch = text.match(/(?:on\s+)?(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?(?!\s*(?:am|pm|:))/i);
           const dayNum = numMatch ? parseInt(numMatch[1]) : null;
 
           if (dayNum && dayNum <= 31) {
             if (monthFound) target.setMonth(months.indexOf(monthFound) % 12);
             target.setDate(dayNum);
-            if (target < today && !monthFound) target.setMonth(target.getMonth() + 1);
+            // If the date is significantly in the past, assume next month
+            if (target.getTime() < today.getTime() - 86400000 && !monthFound) {
+              target.setMonth(target.getMonth() + 1);
+            }
             dateFound = true;
           }
 
           if (!dateFound) {
-            if (text.toLowerCase().includes("tomorrow")) { target.setDate(today.getDate() + 1); dateFound = true; }
-            else if (text.toLowerCase().includes("today")) { dateFound = true; }
+            const lowText = text.toLowerCase();
+            if (lowText.includes("tomorrow")) { target.setDate(today.getDate() + 1); dateFound = true; }
+            else if (lowText.includes("today") || lowText.includes("tonight") || lowText.includes("tonite")) {
+              dateFound = true;
+            }
             else {
-              const dow = daysOfWeek.find(d => text.toLowerCase().includes(d));
+              const dow = daysOfWeek.find(d => lowText.includes(d));
               if (dow) {
                 const todayIdx = today.getDay();
                 const targetIdx = daysOfWeek.indexOf(dow);
                 let diff = targetIdx - todayIdx;
                 if (diff <= 0) diff += 7;
-                if (text.toLowerCase().includes("next") && diff <= 3) diff += 7;
+                if (lowText.includes("next") && diff <= 3) diff += 7;
                 target.setDate(today.getDate() + diff);
                 dateFound = true;
               }
@@ -202,44 +210,41 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           const date = parseDateFromText(processedInput) || today;
           const dStr = formatDate(date);
 
+          // Try to extract a specific deadline time if mentioned
+          const deadlineMatch = processedInput.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i);
+          const deadlineTime = deadlineMatch ? deadlineMatch[0].toUpperCase() : "11:59 PM";
+
           // Logic: Find a gap today or before deadline
-          // Check activities (routine) and currentTasks (events)
           const nowH = today.getHours() + (today.getMinutes() / 60);
           let targetH = 16; // default 4 PM
 
-          // Simple gap check: if today, avoid past
           if (formatDate(date) === formatDate(today)) {
-            targetH = Math.max(16, Math.ceil(nowH + 1));
+            // If due tonight, we need to do it soon if it's already late
+            targetH = Math.max(16, Math.ceil(nowH + 0.5));
           }
 
-          // Check if targetH overlaps with existing tasks
           const overlap = currentTasks.find(t => {
             if (t.time && t.time.includes(dStr)) {
               const taskH = parseTimeString(t.time.split(', ')[1]);
-              return Math.abs(taskH - targetH) < 1;
+              return Math.abs(taskH - targetH) < 0.8;
             }
             return false;
           });
 
-          if (overlap) targetH += 1.5; // push if overlap
-
-          if (targetH > 21) {
-            // Too late today, push to tomorrow morning if deadline allows
-            // For mock simplicity, we'll just cap it or put it tomorrow
-          }
+          if (overlap) targetH += 1.5;
 
           const finalTime = formatTimeFromDecimal(targetH);
           newTasks.push({
             id: crypto.randomUUID(),
-            title: `${name} HW/Assignment`,
+            title: `${name} Assignment`,
             time: `${dStr}, ${finalTime}`,
             type: "study",
             priority: "medium",
             resources,
-            description: `• Homework assignment for ${name}.\n• DEADLINE: ${dStr}`
+            description: `• Work on ${name} assignment.\n• OFFICIAL DEADLINE: ${dStr} at ${deadlineTime}`
           });
 
-          return resolve({ newTasks, message: `I've scheduled your ${name} assignment for ${dStr} at ${finalTime}. I made sure to avoid your existing sessions!` });
+          return resolve({ newTasks, message: `I've scheduled a session for your ${name} assignment for ${dStr} at ${finalTime}. The final deadline is noted as ${deadlineTime}!` });
         }
 
         // Context-aware fallback
