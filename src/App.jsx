@@ -309,27 +309,30 @@ function App() {
 
       const recognition = new SpeechRecognition();
       recognition.lang = 'en-US';
-      recognition.continuous = true;
-      recognition.interimResults = true;
+      recognition.continuous = false; // Minimal network load
+      recognition.interimResults = false; // Only send the final result to reduce socket chatter
 
       recognition.onresult = (event) => {
-        let transcript = "";
-        for (let i = 0; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
-        }
+        const transcript = event.results[0][0].transcript;
+        console.log("Final Transcript:", transcript);
         setInput(transcript);
       };
 
       recognition.onerror = (event) => {
-        console.warn("Speech API error:", event.error);
-        if (event.error === 'network') {
-          console.error("Network restriction detected.");
-        }
+        console.error("Speech API error:", event.error);
       };
 
       recognition.onend = () => {
         if (listeningRef.current) {
-          try { recognition.start(); } catch (e) { }
+          // One-second delay before next capture to keep network happy
+          setTimeout(() => {
+            if (listeningRef.current) {
+              try { recognition.start(); } catch (e) { }
+            }
+          }, 1000);
+        } else {
+          setIsListening(false);
+          recognitionRef.current = null;
         }
       };
 
