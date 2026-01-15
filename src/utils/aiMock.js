@@ -29,13 +29,13 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
     // Fast path triggers
     const isStandardizedTest = globalExams.some(e => processedInput.includes(e));
     const isTestRequest = processedInput.includes("test") || processedInput.includes("exam") || processedInput.includes("quiz");
-    const isSearchNeeded = isStandardizedTest;
 
     setTimeout(async () => {
       try {
         let newTasks = [];
         const lastAILine = lines.filter(l => l.startsWith('Calendly:')).pop() || '';
         const lastAILower = lastAILine.toLowerCase();
+        const isIntensityQuestion = lastAILower.includes("intensity") || lastAILower.includes("normal, moderate, or hardcore");
 
         // --- HELPERS ---
         const daysOfWeek = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -66,7 +66,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           let target = new Date(today);
           let dateFound = false;
           const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december", "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-          const monthFound = months.find(m => text.includes(m));
+          const monthFound = months.find(m => text.toLowerCase().includes(m));
           const numMatch = text.match(/(?:on\s+)?(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?/i);
           const dayNum = numMatch ? parseInt(numMatch[1]) : null;
 
@@ -78,16 +78,16 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           }
 
           if (!dateFound) {
-            if (text.includes("tomorrow")) { target.setDate(today.getDate() + 1); dateFound = true; }
-            else if (text.includes("today")) { dateFound = true; }
+            if (text.toLowerCase().includes("tomorrow")) { target.setDate(today.getDate() + 1); dateFound = true; }
+            else if (text.toLowerCase().includes("today")) { dateFound = true; }
             else {
-              const dow = daysOfWeek.find(d => text.includes(d));
+              const dow = daysOfWeek.find(d => text.toLowerCase().includes(d));
               if (dow) {
                 const todayIdx = today.getDay();
                 const targetIdx = daysOfWeek.indexOf(dow);
                 let diff = targetIdx - todayIdx;
                 if (diff <= 0) diff += 7;
-                if (text.includes("next") && diff <= 3) diff += 7;
+                if (text.toLowerCase().includes("next") && diff <= 3) diff += 7;
                 target.setDate(today.getDate() + diff);
                 dateFound = true;
               }
@@ -99,7 +99,15 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         const getOptimalTime = (date) => {
           const dName = getDayNameFromDate(date);
           const free = activities.find(s => s.isFreeSlot && (s.appliedDays?.includes(dName) || s.frequency === 'daily'));
-          return formatTimeFromDecimal(free ? parseTimeString(free.time.split(' - ')[0]) || 16 : 16);
+          let bestH = free ? parseTimeString(free.time.split(' - ')[0]) || 16 : 16;
+
+          // Strict Rule: Never schedule in the past
+          const nowH = today.getHours() + (today.getMinutes() / 60);
+          if (formatDate(date) === formatDate(today) && bestH <= nowH + 0.5) {
+            bestH = Math.ceil(nowH + 1);
+            if (bestH > 21) return null; // Too late today
+          }
+          return formatTimeFromDecimal(bestH);
         };
 
         const resources = [
@@ -110,7 +118,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
         // --- SUBJECT & CLASS RESOLUTION ---
         const lookup = [...commonSubjects, ...globalExams].sort((a, b) => b.length - a.length);
-        const subId = lookup.find(s => processedInput.includes(s)) || lookup.find(s => lastAILower.includes(s));
+        const subId = lookup.find(s => processedInput.includes(s)) || lookup.find(s => lastAILower.includes(s)) || lookup.find(s => conversationContext.toLowerCase().includes(s));
 
         const classMatch = schedule && subId && schedule.find(c => {
           const n = c.name.toLowerCase();
@@ -120,49 +128,58 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
 
         const name = classMatch ? classMatch.name : (subId ? subId.charAt(0).toUpperCase() + subId.slice(1) : "General");
 
-        const date = parseDateFromText(processedInput);
-        if (date && (isTestRequest || isStandardizedTest)) {
+        // --- BRAIN: HANDLE INTENSITY OR NEW TASK ---
+        const date = parseDateFromText(processedInput) || parseDateFromText(conversationContext.split('\n').slice(-4).join('\n'));
+
+        if (date && (isTestRequest || isStandardizedTest || isIntensityQuestion)) {
           const dStr = formatDate(date);
           const diff = Math.floor((date - today) / 86400000);
 
-          if (onStep && isSearchNeeded) {
-            onStep(`Analyzing ${name} study patterns...`);
-            await new Promise(r => setTimeout(r, 1000));
-          }
-
-          if (diff > 14 && !lastAILower.includes("intensity")) {
+          if (diff > 14 && !isIntensityQuestion) {
             return resolve({ message: `I've noted your ${name} test for ${dStr}. Would you like a Normal, Moderate, or Hardcore plan?` });
           }
 
-          const isIntensity = lastAILower.includes("intensity") || lastAILower.includes("plan?");
-          const mode = isIntensity ? (processedInput.includes("hard") ? "Hardcore" : (processedInput.includes("mod") ? "Moderate" : "Normal")) : "Normal";
+          const mode = processedInput.includes("hard") ? "Hardcore" : (processedInput.includes("mod") ? "Moderate" : "Normal");
           const sessions = mode === "Hardcore" ? 6 : (mode === "Moderate" ? 4 : 2);
 
           // TASK 1: THE TEST
           newTasks.push({ id: crypto.randomUUID(), title: `${name} Test`, time: `${dStr}, 8:00 AM`, type: "task", priority: "high", description: `• Exam day.` });
 
           // TASKS 2+: PREP SESSIONS
-          for (let i = 1; i <= sessions; i++) {
+          let sessionsAdded = 0;
+          for (let i = 1; i <= sessions + 2; i++) {
+            if (sessionsAdded >= sessions) break;
             const d = new Date(date);
             d.setDate(d.getDate() - i);
-            if (d >= today) {
-              const isFinal = (i === 1);
-              newTasks.push({
-                id: crypto.randomUUID(),
-                title: `${name} ${isFinal ? 'Final Review' : 'Prep'}`,
-                time: `${formatDate(d)}, ${getOptimalTime(d)}`,
-                type: "study", resources,
-                description: `• ${isFinal ? 'Active recall and final concept check.' : 'Focus on practice problems and note review.'}`
-              });
+
+            // Strictly check if date is not in the past relative to today
+            if (d.setHours(23, 59, 59, 999) >= today.getTime()) {
+              const bestTime = getOptimalTime(d);
+              if (bestTime) {
+                const isFinal = (sessionsAdded === 0);
+                newTasks.push({
+                  id: crypto.randomUUID(),
+                  title: `${name} ${isFinal ? 'Final Review' : 'Prep'}`,
+                  time: `${formatDate(d)}, ${bestTime}`,
+                  type: "study", resources,
+                  description: `• ${isFinal ? 'Active recall and final concept check.' : 'Focus on practice problems and note review.'}`
+                });
+                sessionsAdded++;
+              }
             }
           }
           return resolve({ newTasks, message: `I've mapped out a high-performance ${mode} plan for your ${name} test on ${dStr}.` });
         }
 
-        resolve({ newTasks: [], message: "Hey! I'm Calendly. Ready to build a high-performance study plan?" });
+        // Context-aware fallback
+        if (lines.length > 2) {
+          resolve({ newTasks: [], message: "I didn't quite catch that. Could you clarify if you want to schedule a test or change a plan?" });
+        } else {
+          resolve({ newTasks: [], message: "Hey! I'm Calendly. Ready to build a high-performance study plan?" });
+        }
       } catch (err) {
         resolve({ newTasks: [], message: "I'm having a bit of trouble. Could you try again?" });
       }
-    }, isSearchNeeded ? 1000 : 10);
+    }, isStandardizedTest ? 1000 : 10);
   });
 };
