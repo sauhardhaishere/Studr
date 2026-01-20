@@ -792,7 +792,7 @@
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  grid-template-rows: repeat(6, minmax(120px, 1fr));
+  grid-auto-rows: minmax(120px, 1fr);
   background: #0a0a0a;
   gap: 0px;
 }
