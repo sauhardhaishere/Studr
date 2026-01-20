@@ -177,119 +177,115 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           { label: "Quizlet", url: "https://quizlet.com" }
         ];
 
-        // --- SUBJECT & CLASS RESOLUTION ---
-        const lookup = [...commonSubjects, ...globalExams].sort((a, b) => b.length - a.length);
+        // --- ADVANCED MULTI-INTENT PARSING ---
+        // Split input by 'and', 'also', or commas to handle "Math on Fri AND Science on Mon"
+        const clauses = processedInput.split(/\s+and\s+|\s*,\s*|\s+also\s+/);
+        let combinedMessage = "";
+        let tasksGeneratedCount = 0;
 
-        // Priority 1: Find ALL subjects mentioned in the input (e.g., "Math and Science")
-        // We filter to find all matches, then unique them to avoid substrings (like 'calc' inside 'calculus')
-        let detectedSubjects = [];
-        lookup.forEach(s => {
-          if (processedInput.includes(s)) {
-            // Check if we already have a "super-string" of this subject (e.g. don't add "calc" if "calculus" is there)
-            const isSubstring = detectedSubjects.some(existing => existing.includes(s) && existing.length > s.length);
-            if (!isSubstring) detectedSubjects.push(s);
-          }
-        });
+        for (const clause of clauses) {
+          const clauseLower = clause.trim();
+          if (!clauseLower) continue;
 
-        // Priority 2: Context Fallback
-        // Only if NO subjects found in current input, look at history
-        if (detectedSubjects.length === 0) {
-          if (isIntensityQuestion) {
-            const prev = lookup.find(s => lastAILower.includes(s));
-            if (prev) detectedSubjects.push(prev);
-          } else {
-            const hist = lookup.find(s => conversationContext.toLowerCase().includes(s));
-            if (hist) detectedSubjects.push(hist);
+          // 1. Detect Subject in this clause
+          const subId = lookup.find(s => clauseLower.includes(s));
+          // Fallback to global context if not found in clause (for single subject split across lines)
+          const finalSubId = subId || (clauses.length === 1 ? lookup.find(s => conversationContext.toLowerCase().includes(s)) : null);
+
+          if (!finalSubId && clauses.length > 1) continue; // Skip empty clauses in multi-clause
+          const subjectToUse = finalSubId || "General";
+
+          // 2. Detect Date in this clause
+          const clauseDate = parseDateFromText(clauseLower);
+          // Verify date is valid and future. If no date in clause, fallback to global date or today
+          const finalDate = clauseDate || (clauses.length === 1 ? (parseDateFromText(processedInput) || parseDateFromText(conversationContext.split('\n').slice(-4).join('\n'))) : null);
+
+          if (!finalDate && clauses.length > 1) continue; // Skip if we can't pin a date for this specific test
+          if (!finalDate) continue; // Should have handled fallback above
+
+          // 3. Resolve Class Name
+          const classMatch = schedule && schedule.find(c => {
+            const n = c.name.toLowerCase();
+            const s = (c.subject || "").toLowerCase();
+            return n.includes(subjectToUse) || s.includes(subjectToUse);
+          });
+          const name = classMatch ? classMatch.name : (subjectToUse.charAt(0).toUpperCase() + subjectToUse.slice(1));
+
+          // 4. Determine Terminology
+          const isQuiz = clauseLower.includes("quiz");
+          const term = isQuiz ? "Quiz" : "Test";
+
+          const dStr = formatDate(finalDate);
+          const diff = Math.floor((finalDate - today) / 86400000);
+
+          // 5. Generate Test Task
+          newTasks.push({ id: crypto.randomUUID(), title: `${name} ${term}`, time: `${dStr}, 8:00 AM`, type: "task", priority: "high", description: `• Exam day.` });
+
+          // 6. Generate Prep Sessions (Staggered)
+          const mode = clauseLower.includes("hard") ? "Hardcore" : (clauseLower.includes("mod") ? "Moderate" : "Normal");
+          const sessions = mode === "Hardcore" ? 7 : (mode === "Moderate" ? 5 : 3);
+
+          // Calculate Spacing
+          const totalAvailableDays = diff - 1;
+
+          for (let i = 1; i <= sessions; i++) {
+            const d = new Date(finalDate);
+            let daysBack = 1;
+
+            if (sessions > 1) {
+              if (diff > 2) {
+                const pct = (i - 1) / (sessions - 1);
+                daysBack = 1 + Math.round(pct * (totalAvailableDays - 1));
+              } else {
+                daysBack = i;
+              }
+            } else {
+              daysBack = 1;
+            }
+
+            d.setDate(d.getDate() - daysBack);
+
+            // --- LOAD BALANCING / STAGGERING ---
+            // Check if we already scheduled a study task on this day for ANOTHER subject
+            // If so, try to shift back 1 day to interleave
+            const dString = formatDate(d);
+            const busyWithOtherStudy = newTasks.find(t =>
+              t.type === 'study' &&
+              t.time.startsWith(dString) &&
+              !t.title.includes(name) // It's another subject
+            );
+
+            if (busyWithOtherStudy && totalAvailableDays > sessions) {
+              // Try shifting back 1 day
+              d.setDate(d.getDate() - 1);
+            }
+            // ------------------------------------
+
+            if (d.setHours(23, 59, 59, 999) < today.getTime()) continue;
+
+            const bestTime = getOptimalTime(d, newTasks);
+            if (bestTime) {
+              const isFinal = (i === 1);
+              newTasks.push({
+                id: crypto.randomUUID(),
+                title: `${name} ${isFinal ? 'Final Review' : 'Prep'}`,
+                time: `${formatDate(d)}, ${bestTime}`,
+                type: "study", resources,
+                description: isFinal
+                  ? `• Final Spaced Review: Active recall on high-yield ${name} concepts.`
+                  : `• Repetition Session: Focusing on weak areas and practice sets.`
+              });
+            }
           }
+
+          if (combinedMessage) combinedMessage += " Also ";
+          else combinedMessage = "I've mapped out a plan for ";
+          combinedMessage += `your ${name} ${term} on ${dStr}`;
+          tasksGeneratedCount++;
         }
 
-        // If still nothing, default to Generic
-        if (detectedSubjects.length === 0) detectedSubjects.push("General");
-
-
-        // --- BRAIN: HANDLE INTENSITY OR NEW TASK ---
-        const date = parseDateFromText(processedInput) || parseDateFromText(conversationContext.split('\n').slice(-4).join('\n'));
-
-        if (date && (isTestRequest || isStandardizedTest || isIntensityQuestion)) {
-          let combinedMessage = "";
-          let subjectsScheduled = 0;
-
-          // Loop through EACH detected subject to schedule them
-          for (const subId of detectedSubjects) {
-            const classMatch = schedule && subId && schedule.find(c => {
-              const n = c.name.toLowerCase();
-              const s = (c.subject || "").toLowerCase();
-              return n.includes(subId) || s.includes(subId);
-            });
-            const name = classMatch ? classMatch.name : (subId ? subId.charAt(0).toUpperCase() + subId.slice(1) : "General");
-
-            const dStr = formatDate(date);
-            const diff = Math.floor((date - today) / 86400000);
-
-            if (diff > 14 && !isIntensityQuestion) {
-              // Only ask intensity if it's the ONLY subject, otherwise default to Normal to avoid chatter
-              if (detectedSubjects.length === 1) {
-                return resolve({ message: `I've noted your ${name} test for ${dStr}. Would you like a Normal, Moderate, or Hardcore plan?` });
-              }
-            }
-
-            const mode = processedInput.includes("hard") ? "Hardcore" : (processedInput.includes("mod") ? "Moderate" : "Normal");
-            const sessions = mode === "Hardcore" ? 7 : (mode === "Moderate" ? 5 : 3);
-
-            const isQuiz = processedInput.includes("quiz");
-            const term = isQuiz ? "Quiz" : "Test";
-
-            // TASK 1: THE TEST
-            newTasks.push({ id: crypto.randomUUID(), title: `${name} ${term}`, time: `${dStr}, 8:00 AM`, type: "task", priority: "high", description: `• Exam day.` });
-
-            // TASKS 2+: SPACED REPETITION SESSIONS
-            let sessionsAdded = 0;
-
-            // Calculate Spacing Logic
-            const totalAvailableDays = diff - 1;
-
-            for (let i = 1; i <= sessions; i++) {
-              const d = new Date(date);
-              let daysBack = 1;
-
-              if (sessions > 1) {
-                if (diff > 2) {
-                  const pct = (i - 1) / (sessions - 1);
-                  daysBack = 1 + Math.round(pct * (totalAvailableDays - 1));
-                } else {
-                  daysBack = i;
-                }
-              } else {
-                daysBack = 1;
-              }
-
-              d.setDate(d.getDate() - daysBack);
-
-              // Safety: Never schedule in the past
-              if (d.setHours(23, 59, 59, 999) < today.getTime()) continue;
-
-              const bestTime = getOptimalTime(d, newTasks);
-              if (bestTime) {
-                const isFinal = (i === 1);
-                newTasks.push({
-                  id: crypto.randomUUID(),
-                  title: `${name} ${isFinal ? 'Final Review' : 'Prep'}`,
-                  time: `${formatDate(d)}, ${bestTime}`,
-                  type: "study", resources,
-                  description: isFinal
-                    ? `• Final Spaced Review: Active recall on high-yield ${name} concepts.`
-                    : `• Repetition Session: Focusing on weak areas and practice sets.`
-                });
-                sessionsAdded++;
-              }
-            }
-            subjectsScheduled++;
-            if (combinedMessage) combinedMessage += " Also ";
-            else combinedMessage = "I've mapped out a plan for ";
-            combinedMessage += `your ${name} test`;
-          }
-
-          return resolve({ newTasks, message: `${combinedMessage} on ${formatDate(date)}. Good luck!` });
+        if (tasksGeneratedCount > 0) {
+          return resolve({ newTasks, message: `${combinedMessage}. Good luck!` });
         }
 
         // --- BRAIN: HANDLE ASSIGNMENTS / HW ---
