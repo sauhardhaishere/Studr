@@ -236,8 +236,11 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
             const mode = processedInput.includes("hard") ? "Hardcore" : (processedInput.includes("mod") ? "Moderate" : "Normal");
             const sessions = mode === "Hardcore" ? 7 : (mode === "Moderate" ? 5 : 3);
 
+            const isQuiz = processedInput.includes("quiz");
+            const term = isQuiz ? "Quiz" : "Test";
+
             // TASK 1: THE TEST
-            newTasks.push({ id: crypto.randomUUID(), title: `${name} Test`, time: `${dStr}, 8:00 AM`, type: "task", priority: "high", description: `• Exam day.` });
+            newTasks.push({ id: crypto.randomUUID(), title: `${name} ${term}`, time: `${dStr}, 8:00 AM`, type: "task", priority: "high", description: `• Exam day.` });
 
             // TASKS 2+: SPACED REPETITION SESSIONS
             let sessionsAdded = 0;

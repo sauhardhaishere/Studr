@@ -49,17 +49,7 @@ const CalendarView = ({ tasks }) => {
         });
     }
 
-    // Fill remaining days from next month to reach exactly 42 (6 weeks)
-    const totalCells = 42;
-    const remaining = totalCells - calendarDays.length;
-    for (let i = 1; i <= remaining; i++) {
-        calendarDays.push({
-            key: `next-${i}`,
-            day: i,
-            isCurrentMonth: false,
-            monthOffset: 1
-        });
-    }
+    // REMOVED: Next month filler days (User requested "this month only")
 
     // --- SMART TASK MATCHING ---
     const getTasksForDay = (item) => {

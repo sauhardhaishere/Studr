@@ -42,7 +42,8 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - **IMMEDIATE ACTION**: After creating the class, IMMEDIATELY schedule the original request.
 
     3. **STUDY HELPER PROTOCOL (SPACED REPETITION):**
-       - **TESTS**: Generate a multi-day plan (Test Task + Prep sessions).
+       - **TERMINOLOGY**: Match the user's language. If they say "Quiz", name the task "Subject Quiz". If "Test" or "Exam", use "Subject Test".
+       - **TESTS/QUIZZES**: Generate a multi-day plan (Test/Quiz Task + Prep sessions).
        - **SPACING**: Use **Spaced Repetition**. If a test is far away (> 14 days), distribute the prep sessions across the entire duration (e.g., every 3-5 days) to maximize long-term retention. 
        - **SCALING**: 
          - If Test is < 1 week away: 3-4 sessions (Clustered). START TODAY.
