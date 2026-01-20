@@ -63,6 +63,7 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - **GAP CHECK**: Always check 'Existing Tasks' and 'User Routine' for the requested date.
        - **SHIFTING**: If a slot (e.g., 4:00 PM) is taken, shift the new task later by at least 1.5 hours (e.g., to 5:30 PM).
        - **8:00 AM RULE**: Do not default everything to 8:00 AM if that slot is already used for a test or a class.
+       - **MULTIPLE REQUEST HANDLING**: If user says "Math and Science test" (plural intents), you MUST generate TWO separate sets of plans in the SAME JSON response (e.g. "Math Test" + "Science Test" and their respective prep sessions).
  
     6. **SMART GAP-FINDING & DURATION MATH:**
        - **NO PAST SCHEDULING**: never pick a time in the past for TODAY.

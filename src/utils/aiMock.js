@@ -180,97 +180,113 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         // --- SUBJECT & CLASS RESOLUTION ---
         const lookup = [...commonSubjects, ...globalExams].sort((a, b) => b.length - a.length);
 
-        // Priority 1: Current message (processed input with typos fixed)
-        let subId = lookup.find(s => processedInput.includes(s));
-
-        // Priority 2: If we are answering an intensity question, look for the previous subject
-        if (!subId && isIntensityQuestion) {
-          subId = lookup.find(s => lastAILower.includes(s));
-        }
-
-        // Priority 3: Last resort - search history
-        if (!subId) {
-          subId = lookup.find(s => conversationContext.toLowerCase().includes(s));
-        }
-
-        const classMatch = schedule && subId && schedule.find(c => {
-          const n = c.name.toLowerCase();
-          const s = (c.subject || "").toLowerCase();
-          return n.includes(subId) || s.includes(subId);
+        // Priority 1: Find ALL subjects mentioned in the input (e.g., "Math and Science")
+        // We filter to find all matches, then unique them to avoid substrings (like 'calc' inside 'calculus')
+        let detectedSubjects = [];
+        lookup.forEach(s => {
+          if (processedInput.includes(s)) {
+            // Check if we already have a "super-string" of this subject (e.g. don't add "calc" if "calculus" is there)
+            const isSubstring = detectedSubjects.some(existing => existing.includes(s) && existing.length > s.length);
+            if (!isSubstring) detectedSubjects.push(s);
+          }
         });
 
-        const name = classMatch ? classMatch.name : (subId ? subId.charAt(0).toUpperCase() + subId.slice(1) : "General");
+        // Priority 2: Context Fallback
+        // Only if NO subjects found in current input, look at history
+        if (detectedSubjects.length === 0) {
+          if (isIntensityQuestion) {
+            const prev = lookup.find(s => lastAILower.includes(s));
+            if (prev) detectedSubjects.push(prev);
+          } else {
+            const hist = lookup.find(s => conversationContext.toLowerCase().includes(s));
+            if (hist) detectedSubjects.push(hist);
+          }
+        }
+
+        // If still nothing, default to Generic
+        if (detectedSubjects.length === 0) detectedSubjects.push("General");
+
 
         // --- BRAIN: HANDLE INTENSITY OR NEW TASK ---
         const date = parseDateFromText(processedInput) || parseDateFromText(conversationContext.split('\n').slice(-4).join('\n'));
 
         if (date && (isTestRequest || isStandardizedTest || isIntensityQuestion)) {
-          const dStr = formatDate(date);
-          const diff = Math.floor((date - today) / 86400000);
+          let combinedMessage = "";
+          let subjectsScheduled = 0;
 
-          if (diff > 14 && !isIntensityQuestion) {
-            return resolve({ message: `I've noted your ${name} test for ${dStr}. Would you like a Normal, Moderate, or Hardcore plan?` });
-          }
+          // Loop through EACH detected subject to schedule them
+          for (const subId of detectedSubjects) {
+            const classMatch = schedule && subId && schedule.find(c => {
+              const n = c.name.toLowerCase();
+              const s = (c.subject || "").toLowerCase();
+              return n.includes(subId) || s.includes(subId);
+            });
+            const name = classMatch ? classMatch.name : (subId ? subId.charAt(0).toUpperCase() + subId.slice(1) : "General");
 
-          const mode = processedInput.includes("hard") ? "Hardcore" : (processedInput.includes("mod") ? "Moderate" : "Normal");
-          const sessions = mode === "Hardcore" ? 7 : (mode === "Moderate" ? 5 : 3);
+            const dStr = formatDate(date);
+            const diff = Math.floor((date - today) / 86400000);
 
-          // TASK 1: THE TEST
-          newTasks.push({ id: crypto.randomUUID(), title: `${name} Test`, time: `${dStr}, 8:00 AM`, type: "task", priority: "high", description: `• Exam day.` });
-
-          // TASKS 2+: SPACED REPETITION SESSIONS
-          let sessionsAdded = 0;
-
-          // Calculate Spacing Logic
-          // We want the Start Date to be Today (or tomorrow) and the End Date to be Day-1 before Test.
-          // We spread 'sessions' evenly across this range.
-          const totalAvailableDays = diff - 1;
-
-          for (let i = 1; i <= sessions; i++) {
-            const d = new Date(date);
-
-            // i=1 -> Final Review (1 day back)
-            // i=sessions -> Start Date (Spread out)
-            // Formula: Lerp between 1 and totalAvailableDays
-            let daysBack = 1;
-
-            if (sessions > 1) {
-              // Linear spread:
-              // i=1 (last session chronologically) -> daysBack = 1
-              // i=sessions (first session chronologically) -> daysBack = totalAvailableDays
-              // We map i [1..sessions] to range [1..totalAvailableDays]
-              if (diff > 2) {
-                const pct = (i - 1) / (sessions - 1);
-                daysBack = 1 + Math.round(pct * (totalAvailableDays - 1));
-              } else {
-                // If very tight schedule, just decrement by 1
-                daysBack = i;
+            if (diff > 14 && !isIntensityQuestion) {
+              // Only ask intensity if it's the ONLY subject, otherwise default to Normal to avoid chatter
+              if (detectedSubjects.length === 1) {
+                return resolve({ message: `I've noted your ${name} test for ${dStr}. Would you like a Normal, Moderate, or Hardcore plan?` });
               }
-            } else {
-              daysBack = 1;
             }
 
-            d.setDate(d.getDate() - daysBack);
+            const mode = processedInput.includes("hard") ? "Hardcore" : (processedInput.includes("mod") ? "Moderate" : "Normal");
+            const sessions = mode === "Hardcore" ? 7 : (mode === "Moderate" ? 5 : 3);
 
-            // Safety: Never schedule in the past
-            if (d.setHours(23, 59, 59, 999) < today.getTime()) continue;
+            // TASK 1: THE TEST
+            newTasks.push({ id: crypto.randomUUID(), title: `${name} Test`, time: `${dStr}, 8:00 AM`, type: "task", priority: "high", description: `• Exam day.` });
 
-            const bestTime = getOptimalTime(d, newTasks);
-            if (bestTime) {
-              const isFinal = (i === 1);
-              newTasks.push({
-                id: crypto.randomUUID(),
-                title: `${name} ${isFinal ? 'Final Review' : 'Prep'}`,
-                time: `${formatDate(d)}, ${bestTime}`,
-                type: "study", resources,
-                description: isFinal
-                  ? `• Final Spaced Review: Active recall on high-yield ${name} concepts.`
-                  : `• Repetition Session: Focusing on weak areas and practice sets.`
-              });
-              sessionsAdded++;
+            // TASKS 2+: SPACED REPETITION SESSIONS
+            let sessionsAdded = 0;
+
+            // Calculate Spacing Logic
+            const totalAvailableDays = diff - 1;
+
+            for (let i = 1; i <= sessions; i++) {
+              const d = new Date(date);
+              let daysBack = 1;
+
+              if (sessions > 1) {
+                if (diff > 2) {
+                  const pct = (i - 1) / (sessions - 1);
+                  daysBack = 1 + Math.round(pct * (totalAvailableDays - 1));
+                } else {
+                  daysBack = i;
+                }
+              } else {
+                daysBack = 1;
+              }
+
+              d.setDate(d.getDate() - daysBack);
+
+              // Safety: Never schedule in the past
+              if (d.setHours(23, 59, 59, 999) < today.getTime()) continue;
+
+              const bestTime = getOptimalTime(d, newTasks);
+              if (bestTime) {
+                const isFinal = (i === 1);
+                newTasks.push({
+                  id: crypto.randomUUID(),
+                  title: `${name} ${isFinal ? 'Final Review' : 'Prep'}`,
+                  time: `${formatDate(d)}, ${bestTime}`,
+                  type: "study", resources,
+                  description: isFinal
+                    ? `• Final Spaced Review: Active recall on high-yield ${name} concepts.`
+                    : `• Repetition Session: Focusing on weak areas and practice sets.`
+                });
+                sessionsAdded++;
+              }
             }
+            subjectsScheduled++;
+            if (combinedMessage) combinedMessage += " Also ";
+            else combinedMessage = "I've mapped out a plan for ";
+            combinedMessage += `your ${name} test`;
           }
-          return resolve({ newTasks, message: `I've mapped out a high-performance ${mode} plan for your ${name} test on ${dStr}. This uses spaced repetition across ${sessionsAdded} sessions to maximize retention.` });
+
+          return resolve({ newTasks, message: `${combinedMessage} on ${formatDate(date)}. Good luck!` });
         }
 
         // --- BRAIN: HANDLE ASSIGNMENTS / HW ---
