@@ -16,7 +16,8 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       "biology": "biology", "bio": "biology", "chemistry": "chemistry", "chem": "chemistry",
       "spanish": "spanish", "sapnish": "spanish", "spansih": "spanish", "span": "spanish", "spanihs": "spanish",
       "physics": "physics", "phys": "physics",
-      "tommorow": "tomorrow", "tommorrow": "tomorrow", "tmrw": "tomorrow", "wenesday": "wednesday", "wensday": "wednesday"
+      "tommorow": "tomorrow", "tommorrow": "tomorrow", "tmrw": "tomorrow", "wenesday": "wednesday", "wensday": "wednesday",
+      "econ": "economics", "ecomic": "economics"
     };
 
     let processedInput = userCleanInput;
@@ -27,7 +28,7 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
       if (processedInput.includes(typo)) processedInput = processedInput.replace(typo, corrections[typo]);
     });
 
-    const commonSubjects = ["math", "science", "history", "english", "spanish", "physics", "biology", "chemistry", "algebra", "geometry", "calculus", "stats", "latin"];
+    const commonSubjects = ["math", "science", "history", "english", "spanish", "physics", "biology", "chemistry", "algebra", "geometry", "calculus", "stats", "latin", "economics", "govt", "psychology"];
     const globalExams = ["gaokao", "sat", "act", "lsat", "mcat", "ap", "gre", "gmat"];
 
     // Fast path triggers
@@ -122,17 +123,51 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           return dateFound ? target : null;
         };
 
-        const getOptimalTime = (date) => {
+        const getOptimalTime = (date, futureTasks = []) => {
+          const dStr = formatDate(date);
           const dName = getDayNameFromDate(date);
+
+          // Get base time from free slot or default to 4 PM
           const free = activities.find(s => s.isFreeSlot && (s.appliedDays?.includes(dName) || s.frequency === 'daily'));
           let bestH = free ? parseTimeString(free.time.split(' - ')[0]) || 16 : 16;
 
-          // Strict Rule: Never schedule in the past
+          // Never schedule in the past
           const nowH = today.getHours() + (today.getMinutes() / 60);
-          if (formatDate(date) === formatDate(today) && bestH <= nowH + 0.5) {
-            bestH = Math.ceil(nowH + 1);
-            if (bestH > 21) return null; // Too late today
+          if (formatDate(date) === formatDate(today)) {
+            bestH = Math.max(bestH, Math.ceil(nowH + 0.5));
           }
+
+          // Check for conflicts recursively
+          const isTimeTaken = (h) => {
+            // Check existing tasks
+            const existingConflict = currentTasks.find(t => {
+              if (t.time && t.time.includes(dStr)) {
+                const taskH = parseTimeString(t.time.split(', ')[1]);
+                return Math.abs(taskH - h) < 1; // 1 hour buffer
+              }
+              return false;
+            });
+            if (existingConflict) return true;
+
+            // Check future tasks (being generated right now)
+            const futureConflict = futureTasks.find(t => {
+              if (t.time && t.time.includes(dStr)) {
+                const taskH = parseTimeString(t.time.split(', ')[1]);
+                return Math.abs(taskH - h) < 1;
+              }
+              return false;
+            });
+            return !!futureConflict;
+          };
+
+          // Find first available slot
+          let iterations = 0;
+          while (isTimeTaken(bestH) && iterations < 5) {
+            bestH += 1.5; // Offset by 1.5 hours for next slot
+            iterations++;
+          }
+
+          if (bestH > 22) return null; // Too late
           return formatTimeFromDecimal(bestH);
         };
 
@@ -187,22 +222,40 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           let sessionsAdded = 0;
 
           // Calculate Spacing Logic
-          // If the test is more than 14 days away, we space them out.
-          // Otherwise, we group them closer.
-          const interval = diff > 21 ? Math.floor(diff / sessions) : (diff > 10 ? 3 : 1);
+          // We want the Start Date to be Today (or tomorrow) and the End Date to be Day-1 before Test.
+          // We spread 'sessions' evenly across this range.
+          const totalAvailableDays = diff - 1;
 
           for (let i = 1; i <= sessions; i++) {
             const d = new Date(date);
 
-            // The first session (i=1) is ALWAYS the day before (Final Review)
-            // Subsequent sessions are spaced out using the calculated interval
-            const daysBack = i === 1 ? 1 : (i - 1) * interval;
+            // i=1 -> Final Review (1 day back)
+            // i=sessions -> Start Date (Spread out)
+            // Formula: Lerp between 1 and totalAvailableDays
+            let daysBack = 1;
+
+            if (sessions > 1) {
+              // Linear spread:
+              // i=1 (last session chronologically) -> daysBack = 1
+              // i=sessions (first session chronologically) -> daysBack = totalAvailableDays
+              // We map i [1..sessions] to range [1..totalAvailableDays]
+              if (diff > 2) {
+                const pct = (i - 1) / (sessions - 1);
+                daysBack = 1 + Math.round(pct * (totalAvailableDays - 1));
+              } else {
+                // If very tight schedule, just decrement by 1
+                daysBack = i;
+              }
+            } else {
+              daysBack = 1;
+            }
+
             d.setDate(d.getDate() - daysBack);
 
             // Safety: Never schedule in the past
             if (d.setHours(23, 59, 59, 999) < today.getTime()) continue;
 
-            const bestTime = getOptimalTime(d);
+            const bestTime = getOptimalTime(d, newTasks);
             if (bestTime) {
               const isFinal = (i === 1);
               newTasks.push({
@@ -236,24 +289,9 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
           }
 
           const dStr = formatDate(workDate);
-          const nowH = today.getHours() + (today.getMinutes() / 60);
-          let targetH = 16; // default 4 PM
+          const finalTime = getOptimalTime(workDate, newTasks);
+          if (!finalTime) return resolve({ newTasks: [], message: "I couldn't find a free slot for your assignment tonight. Try clearing some time!" });
 
-          if (formatDate(workDate) === formatDate(today)) {
-            targetH = Math.max(16, Math.ceil(nowH + 0.5));
-          }
-
-          const overlap = currentTasks.find(t => {
-            if (t.time && t.time.includes(dStr)) {
-              const taskH = parseTimeString(t.time.split(', ')[1]);
-              return Math.abs(taskH - targetH) < 0.8;
-            }
-            return false;
-          });
-
-          if (overlap) targetH += 1.5;
-
-          const finalTime = formatTimeFromDecimal(targetH);
           newTasks.push({
             id: crypto.randomUUID(),
             title: `${name} Assignment`,

@@ -34,6 +34,7 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
     ${calendarTable}
     
     2. **CLASS VERIFICATION & AGENTIC CREATION:**
+       - **MATCHING**: Check 'User's Classes' for abbreviations (e.g. "Econ" -> "Economics", "Chem" -> "Chemistry"). Use the EXISTING class name if a fuzzy match is found. 
        - **VERIFICATION**: If a subject is mentioned but not in 'User's Classes', check if it is a **Standardized/Global Test** (e.g. SAT, ACT, Gaokao, IELTS, TOEFL, GRE, LSAT, MCAT). 
        - **BYPASS**: If it IS a global test (like Gaokao), do NOT ask for a class name. Create the task directly.
        - **PROMPT**: Only if it is a regular school class (History, Math, etc.) and missing, ask: "What's the full name of that class in your schedule?"
@@ -44,11 +45,12 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - **TESTS**: Generate a multi-day plan (Test Task + Prep sessions).
        - **SPACING**: Use **Spaced Repetition**. If a test is far away (> 14 days), distribute the prep sessions across the entire duration (e.g., every 3-5 days) to maximize long-term retention. 
        - **SCALING**: 
-         - If Test is < 1 week away: 2-3 sessions (Clustered).
-         - If Test is 1-2 weeks away: 4 sessions (Spaced).
+         - If Test is < 1 week away: 3-4 sessions (Clustered). START TODAY.
+         - If Test is 1-2 weeks away: 4-5 sessions (Spaced). START IMMEDIATELY (or at least 7 days prior).
          - If Test is > 2 weeks away: ASK FOR **INTENSITY LEVEL**: "I've noted your test! Would you like a Normal, Moderate, or Hardcore study plan?"
          - **SESSIONS**: Normal = 3 sessions, Moderate = 5 sessions, Hardcore = 7 sessions.
        - **TIMING**: Always place the 'Final Review' session EXACTLY 1 day before the test.
+       - **LOAD BALANCING**: If preparing for MULTIPLE subjects (e.g. Math & Science), **INTERLEAVE** the sessions. Do NOT schedule "Math Prep" and "Science Prep" on the same day if possible. Spread them out to different days to reduce stress.
  
     4. **ASSIGNMENT PROTOCOL (HW & PROJECTS):**
        - **RECOGNITION**: Detect keywords like "homework", "hw", "assignment", or "due".
@@ -56,12 +58,18 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
        - **OPTIMIZATION**: Find a 1-hour gap today or tomorrow BEFORE the deadline. Ensure it does NOT overlap with a class or an existing study session.
        - **DESCRIPTION**: Include the deadline in the task description.
  
-    5. **SMART GAP-FINDING & DURATION MATH:**
+    5. **ZERO COLLISION POLICY:**
+       - **STRICT RULE**: You CANNOT schedule two tasks at the same time.
+       - **GAP CHECK**: Always check 'Existing Tasks' and 'User Routine' for the requested date.
+       - **SHIFTING**: If a slot (e.g., 4:00 PM) is taken, shift the new task later by at least 1.5 hours (e.g., to 5:30 PM).
+       - **8:00 AM RULE**: Do not default everything to 8:00 AM if that slot is already used for a test or a class.
+ 
+    6. **SMART GAP-FINDING & DURATION MATH:**
        - **NO PAST SCHEDULING**: never pick a time in the past for TODAY.
        - **USER OVERRIDE**: If user says "any" or "anytime", pick 4 PM or the best available slot between 3 PM and 9 PM.
        - **NO BOLDING**: Do NOT use **bold** in your response messages.
 
-    6. **RESOURCES & ASSETS**:
+    7. **RESOURCES & ASSETS**:
        - ALWAYS include these resources in EVERY study/prep task:
          1. {"label": "Study Coach (AI)", "url": "https://www.playlab.ai/project/cmi7fu59u07kwl10uyroeqf8n"}
          2. {"label": "Knowt", "url": "https://knowt.com"}
@@ -82,7 +90,7 @@ export const generateScheduleFromAI = async (userInput, tasks, activities, sched
             : "";
 
         const lowerInput = userInput.toLowerCase();
-        const commonSubjects = ["math", "science", "history", "english", "spanish", "physics", "bio", "chem", "biology", "chemistry", "algebra", "geometry", "calc", "calculus", "stats"];
+        const commonSubjects = ["math", "science", "history", "english", "spanish", "physics", "bio", "chem", "biology", "chemistry", "algebra", "geometry", "calc", "calculus", "stats", "econ", "economics", "govt", "government", "psych", "psychology"];
         const isCommonSubject = commonSubjects.some(s => lowerInput.includes(s));
         const isStandardized = lowerInput.includes("gaokao") || lowerInput.includes("sat") || lowerInput.includes("act") || lowerInput.includes("ap") || lowerInput.includes("lsat") || lowerInput.includes("mcat");
 
