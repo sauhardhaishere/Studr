@@ -178,6 +178,8 @@ export const simulateAIAnalysis = async (conversationContext, currentTasks, acti
         ];
 
         // --- ADVANCED MULTI-INTENT PARSING ---
+        const lookup = [...commonSubjects, ...globalExams].sort((a, b) => b.length - a.length);
+
         // Split input by 'and', 'also', or commas to handle "Math on Fri AND Science on Mon"
         const clauses = processedInput.split(/\s+and\s+|\s*,\s*|\s+also\s+/);
         let combinedMessage = "";
