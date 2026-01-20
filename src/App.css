@@ -729,15 +729,16 @@
 /* CALENDAR UPDATES */
 .calendar-container {
   padding: 0;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
-  height: 100%;
   min-height: 600px;
   background: black;
   border: 1px solid #1a1a1a;
   border-radius: 16px;
+  /* Removed height: 100% and overflow: hidden so it grows with content */
 }
+
+/* ... existing header styles ... */
 
 .calendar-header {
   padding: 24px;
@@ -791,7 +792,7 @@
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  grid-template-rows: repeat(6, 120px);
+  grid-template-rows: repeat(6, minmax(120px, 1fr));
   background: #0a0a0a;
   gap: 0px;
 }
